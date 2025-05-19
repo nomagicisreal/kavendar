@@ -1,5 +1,5 @@
 # Kavendar
-a dart calendar package.
+a dart calendar package on [Pub.dev](https://pub.dev/packages/kavendar)
 
 ## Description
 the event types in calendar:
