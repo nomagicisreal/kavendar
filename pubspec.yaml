@@ -1,0 +1,22 @@
+name: kavendar
+description: calendar for any task, event
+version: 0.0.1
+repository: https://github.com/nomagicisreal/kavendar
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  table_calendar: ^3.2.0
+  # path: ^1.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^5.0.0
+  test: ^1.24.0
+
+flutter:
+  uses-material-design: true
