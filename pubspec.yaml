@@ -1,6 +1,6 @@
 name: kavendar
 description: calendar for any task, event
-version: 0.0.2
+version: 0.0.3
 repository: https://github.com/nomagicisreal/kavendar
 
 environment:
