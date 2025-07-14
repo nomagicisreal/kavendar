@@ -1,5 +1,10 @@
 import 'package:damath/damath.dart' as da;
 
+// DirectionIn4 -> ltrb
+
+///
+///
+///
 extension DateTimeExtension on DateTime {
   static DateTime normalizeDate(DateTime datetime) =>
       DateTime.utc(datetime.year, datetime.month, datetime.day);
@@ -9,6 +14,21 @@ extension DateTimeExtension on DateTime {
         date.year,
       ).difference(DateTime.utc(date.year, date.month, date.day)).inDays +
       1;
+
+  static int weekYearIndexOf(
+    DateTime date, [
+    int startingDay = DateTime.sunday,
+  ]) {
+    final startingDate = DateTime.utc(date.year);
+    final days = startingDate.difference(normalizeDate(date)).inDays;
+    final remains = days % DateTime.daysPerWeek;
+    final weeks = days ~/ 7;
+    if (remains == 0) return weeks;
+
+    final previousDays = (startingDate.weekday - startingDay) % 7;
+    if (remains + previousDays > DateTime.daysPerWeek) return weeks + 1;
+    return weeks;
+  }
 
   ///
   ///

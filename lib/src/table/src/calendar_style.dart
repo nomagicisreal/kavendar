@@ -1,13 +1,17 @@
+import 'package:damath/damath.dart';
 import 'package:flutter/material.dart';
+import 'package:kavendar/kavendar.dart';
 
 ///
 /// [OnDaySelected]
+/// [OnPageChanged]
 /// [OnRangeSelected]
-/// [RangeSelectionMode]
-///
 /// [SingleMarkerBuilder]
 /// [MarkerBuilder]
 /// [HighlightBuilder]
+///
+/// [RangeSelectionMode]
+///
 ///
 /// [CalendarBuilders]
 /// [CalendarStyle]
@@ -17,6 +21,11 @@ import 'package:flutter/material.dart';
 ///
 ///
 
+typedef PositionedOffset = (double?, double?, double?, double?);
+
+///
+///
+///
 typedef OnDaySelected =
     void Function(DateTime selectedDay, DateTime focusedDay);
 
@@ -25,6 +34,15 @@ typedef OnPageChanged = void Function(int index, DateTime focusedDay);
 typedef OnRangeSelected =
     void Function(DateTime? start, DateTime? end, DateTime focusedDay);
 
+typedef DayBuilder = Widget? Function(DateTime day);
+
+typedef FocusedDayBuilder = Widget? Function(DateTime day, DateTime focusedDay);
+
+typedef TextFormatter = String Function(DateTime date, dynamic locale);
+
+///
+///
+///
 enum RangeSelectionMode {
   disabled,
   toggledOff,
@@ -39,15 +57,6 @@ enum RangeSelectionMode {
       this == RangeSelectionMode.toggledOn ||
       this == RangeSelectionMode.enforced;
 }
-
-///
-///
-///
-typedef DayBuilder = Widget? Function(DateTime day);
-
-typedef FocusedDayBuilder = Widget? Function(DateTime day, DateTime focusedDay);
-
-typedef TextFormatter = String Function(DateTime date, dynamic locale);
 
 enum AvailableScroll {
   none,
@@ -85,18 +94,16 @@ typedef ConstraintsBuilder =
 
 typedef HighlightBuilder = Widget? Function(DateTime day);
 
-typedef SingleMarkerBuilder<T> = Widget? Function(DateTime day, T event);
-
 typedef MarkerBuilder<T> =
     Widget? Function(BoxConstraints constraints, DateTime day, List<T>? events);
 
-///
-///
-///
-///
+typedef SingleMarkerBuilder<T> = Widget? Function(DateTime day, T event);
 
-/// Class containing all custom builders for `TableCalendar`.
+///
+///
+///
 class CalendarBuilders<T> {
+  final CalendarStyle style;
   final FocusedDayBuilder? prioritizedBuilder;
   final FocusedDayBuilder? todayBuilder;
   final FocusedDayBuilder? selectedBuilder;
@@ -109,12 +116,13 @@ class CalendarBuilders<T> {
   final FocusedDayBuilder? defaultBuilder;
   final HighlightBuilder? rangeHighlightBuilder;
   final SingleMarkerBuilder<T>? singleMarkerBuilder;
-  final MarkerBuilder<T>? markerBuilder;
-  final DayBuilder? dowBuilder;
+  final MarkerBuilder<T>? _markerBuilder;
+  final DayBuilder? dayOfWeekBuilder;
   final DayBuilder? headerTitleBuilder;
-  final Widget? Function(int weekNumber)? weekNumberBuilder;
+  final Widget? Function(int weekNumber)? weekYearIndexBuilder;
 
   const CalendarBuilders({
+    required this.style,
     this.prioritizedBuilder,
     this.todayBuilder,
     this.selectedBuilder,
@@ -127,184 +135,171 @@ class CalendarBuilders<T> {
     this.defaultBuilder,
     this.rangeHighlightBuilder,
     this.singleMarkerBuilder,
-    this.markerBuilder,
-    this.dowBuilder,
+    this.dayOfWeekBuilder,
     this.headerTitleBuilder,
-    this.weekNumberBuilder,
-  });
+    this.weekYearIndexBuilder,
+    MarkerBuilder<T>? markerBuilder,
+  }) : _markerBuilder = markerBuilder;
+
+  ///
+  /// TODO: statically
+  ///
+  Widget _dayBuilderMarkerRowChild(DateTime day, T event, double markerSize) =>
+      singleMarkerBuilder?.call(day, event) ??
+      Container(
+        width: markerSize,
+        height: markerSize,
+        margin: style.marker!.cellMarkerMargin,
+        decoration: style.marker!.cellMarkerDecoration,
+      );
+
+  Widget? _dayBuilderMarker(
+    BoxConstraints constraints,
+    DateTime day,
+    List<T>? events,
+  ) {
+    if (events == null) return null;
+    if (events.isEmpty) return null;
+    final center = constraints.maxHeight / 2;
+    final shorterSide = BoxConstraintsExtension.shortSide(constraints);
+
+    final markerSize =
+        style.marker!.cellMarkerSize ??
+        (shorterSide - style.cellMargin.vertical) *
+            style.marker!.cellMarkerSizeScale;
+
+    return PositionedDirectional(
+      start: style.marker!.getMarkerPosition(DirectionIn4.left),
+      top: style.marker!.getMarkerPosition(
+        DirectionIn4.top,
+        center +
+            (shorterSide - style.cellMargin.vertical) / 2 -
+            (markerSize * style.marker!.cellMarkersAnchor),
+      ),
+      end: style.marker!.getMarkerPosition(DirectionIn4.right),
+      bottom: style.marker!.getMarkerPosition(DirectionIn4.bottom),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children:
+            events
+                .take(style.marker!.cellMarkersMax)
+                .map((e) => _dayBuilderMarkerRowChild(day, e, markerSize))
+                .toList(),
+      ),
+    );
+  }
+
+  MarkerBuilder<T> get markerBuilder => _markerBuilder ?? _dayBuilderMarker;
 }
 
-/// Class containing styling and configuration for `TableCalendar`'s content.
-class CalendarStyle {
-  final int markersMaxCount;
-  final Clip cellMarkersClip;
-  final bool markersAutoAligned;
+///
+///
+///
+class CalendarMarker {
+  final int cellMarkersMax;
+  final double cellMarkersAnchor;
+  final PositionedOffset? cellMarkersPosition;
+  final double? cellMarkerSize;
+  final double cellMarkerSizeScale;
+  final Decoration cellMarkerDecoration;
+  final EdgeInsets cellMarkerMargin;
 
-  /// Specifies the anchor point of single event markers if `markersAutoAligned` is `true`.
-  /// A value of `0.5` will center the markers at the bottom edge of day cell's decoration.
-  ///
-  /// Includes `cellMargin` for calculations.
-  final double markersAnchor;
-
-  /// The size of single event marker dot.
-  ///
-  /// By default `markerSizeScale` is used. To use `markerSize` instead, simply provide a non-null value.
-  final double? markerSize;
-
-  /// Proportion of single event marker dot size in relation to day cell size.
-  ///
-  /// Includes `cellMargin` for calculations.
-  final double markerSizeScale;
-
-  /// `PositionedOffset` for event markers. Allows to specify `top`, `bottom`, `start` and `end`.
-  final PositionedOffset markersOffset;
-
-  /// General `Alignment` for event markers.
-  /// Will have no effect on markers if `markersAutoAligned` or `markersOffset` is used.
-  final AlignmentGeometry cellMarkersAlignment;
-
-  /// Decoration of single event markers. Affects each marker dot.
-  final Decoration markerDecoration;
-
-  /// Margin of single event markers. Affects each marker dot.
-  final EdgeInsets markerMargin;
-
-  /// Margin of each individual day cell.
-  final EdgeInsets cellMargin;
-
-  /// Padding of each individual day cell.
-  final EdgeInsets cellPadding;
-
-  /// Alignment of each individual day cell.
-  final AlignmentGeometry cellAlignment;
-
-  /// Proportion of range selection highlight size in relation to day cell size.
-  ///
-  /// Includes `cellMargin` for calculations.
-  final double rangeHighlightScale;
-
-  /// Color of range selection highlight.
-  final Color rangeHighlightColor;
-
-  /// Determines if day cells that do not match the currently focused month should be visible.
-  ///
-  /// Affects only `CalendarFormat.month`.
-  final bool outsideDaysVisible;
-
-  /// Determines if a day cell that matches the current day should be highlighted.
-  final bool isTodayHighlighted;
-
-  /// TextStyle for a day cell that matches the current day.
-  final TextStyle todayTextStyle;
-
-  /// Decoration for a day cell that matches the current day.
-  final Decoration todayDecoration;
-
-  /// TextStyle for day cells that are currently marked as selected by `selectedDayPredicate`.
-  final TextStyle selectedTextStyle;
-
-  /// Decoration for day cells that are currently marked as selected by `selectedDayPredicate`.
-  final Decoration selectedDecoration;
-
-  /// TextStyle for a day cell that is the start of current range selection.
-  final TextStyle rangeStartTextStyle;
-
-  /// Decoration for a day cell that is the start of current range selection.
-  final Decoration rangeStartDecoration;
-
-  /// TextStyle for a day cell that is the end of current range selection.
-  final TextStyle rangeEndTextStyle;
-
-  /// Decoration for a day cell that is the end of current range selection.
-  final Decoration rangeEndDecoration;
-
-  /// TextStyle for day cells that fall within the currently selected range.
-  final TextStyle withinRangeTextStyle;
-
-  /// Decoration for day cells that fall within the currently selected range.
-  final Decoration withinRangeDecoration;
-
-  /// TextStyle for day cells, of which the `day.month` is different than `focusedDay.month`.
-  /// This will affect day cells that do not match the currently focused month.
-  final TextStyle outsideTextStyle;
-
-  /// Decoration for day cells, of which the `day.month` is different than `focusedDay.month`.
-  /// This will affect day cells that do not match the currently focused month.
-  final Decoration outsideDecoration;
-
-  /// TextStyle for day cells that have been disabled.
-  ///
-  /// This refers to dates disabled by returning false in `enabledDayPredicate`,
-  /// as well as dates that are outside of the bounds set up by `firstDay` and `lastDay`.
-  final TextStyle disabledTextStyle;
-
-  /// Decoration for day cells that have been disabled.
-  ///
-  /// This refers to dates disabled by returning false in `enabledDayPredicate`,
-  /// as well as dates that are outside of the bounds set up by `firstDay` and `lastDay`.
-  final Decoration disabledDecoration;
-
-  /// TextStyle for day cells that are marked as holidays by `holidayPredicate`.
-  final TextStyle holidayTextStyle;
-
-  /// Decoration for day cells that are marked as holidays by `holidayPredicate`.
-  final Decoration holidayDecoration;
-
-  /// TextStyle for day cells that match `weekendDay` list.
-  final TextStyle weekendTextStyle;
-
-  /// Decoration for day cells that match `weekendDay` list.
-  final Decoration weekendDecoration;
-
-  /// TextStyle for week number.
-  final TextStyle weekNumberTextStyle;
-
-  /// TextStyle for day cells that do not match any other styles.
-  final TextStyle defaultTextStyle;
-
-  /// Decoration for day cells that do not match any other styles.
-  final Decoration defaultDecoration;
-
-  /// Decoration for each interior row of day cells.
-  final Decoration rowDecoration;
-
-  /// Border for the internal `Table` widget.
-  final TableBorder tableBorder;
-
-  /// Padding for the internal `Table` widget.
-  final EdgeInsets tablePadding;
-
-  /// Use to customize the text within each day cell.
-  /// Defaults to `'${date.day}'`, to show just the day number.
-  ///
-  /// Example usage:
-  /// ```dart
-  /// dayTextFormatter: (date, locale) => DateFormat.d(locale).format(date),
-  /// ```
-  final TextFormatter? dayTextFormatter;
-
-  /// Creates a `CalendarStyle` used by `TableCalendar` widget.
-  const CalendarStyle({
-    this.isTodayHighlighted = true,
-    this.cellMarkersClip = Clip.none,
-    this.outsideDaysVisible = true,
-    this.markersAutoAligned = true,
-    this.markerSize,
-    this.markerSizeScale = 0.2,
-    this.markersAnchor = 0.7,
-    this.rangeHighlightScale = 1.0,
-    this.markerMargin = const EdgeInsets.symmetric(horizontal: 0.3),
-    this.cellMarkersAlignment = Alignment.bottomCenter,
-    this.markersMaxCount = 4,
-    this.cellMargin = const EdgeInsets.all(6.0),
-    this.cellPadding = EdgeInsets.zero,
-    this.cellAlignment = Alignment.center,
-    this.markersOffset = const PositionedOffset(),
-    this.rangeHighlightColor = const Color(0xFFBBDDFF),
-    this.markerDecoration = const BoxDecoration(
+  const CalendarMarker({
+    this.cellMarkerSize,
+    this.cellMarkersPosition,
+    this.cellMarkerSizeScale = 0.2,
+    this.cellMarkersAnchor = 0.7,
+    this.cellMarkerMargin = const EdgeInsets.symmetric(horizontal: 0.3),
+    this.cellMarkersMax = 4,
+    this.cellMarkerDecoration = const BoxDecoration(
       color: Color(0xFF263238),
       shape: BoxShape.circle,
     ),
+  });
+
+  double? getMarkerPosition(DirectionIn4 direction, [double? positionDefault]) {
+    final position = cellMarkersPosition;
+    return position == null
+        ? positionDefault
+        : switch (direction) {
+          DirectionIn4.left => position.$1,
+          DirectionIn4.top => position.$2,
+          DirectionIn4.right => position.$3,
+          DirectionIn4.bottom => position.$4,
+        };
+  }
+}
+
+///
+///
+/// [dayTextFormatter], ...
+/// [todayIsHighlighted], ...
+/// [rangeHighlightScale], ...
+///
+class CalendarStyle {
+  final TextFormatter? dayTextFormatter;
+  final EdgeInsets cellMargin;
+  final EdgeInsets cellPadding;
+  final AlignmentGeometry cellAlignment;
+  final AlignmentGeometry cellStackAlignment;
+  final Clip cellStackClip;
+  final TextStyle weekNumberTextStyle;
+  final Decoration rowDecoration;
+  final TableBorder tableBorder;
+  final EdgeInsets tablePadding;
+
+  ///
+  ///
+  ///
+  final bool todayIsHighlighted;
+  final TextStyle todayTextStyle;
+  final Decoration todayDecoration;
+  final TextStyle defaultTextStyle;
+  final Decoration defaultDecoration;
+  final TextStyle holidayTextStyle;
+  final Decoration holidayDecoration;
+  final TextStyle weekendTextStyle;
+  final Decoration weekendDecoration;
+  final TextStyle outsideTextStyle;
+  final Decoration? outsideDecoration;
+  final TextStyle disabledTextStyle;
+  final Decoration disabledDecoration;
+  final TextStyle selectedTextStyle;
+  final Decoration selectedDecoration;
+
+  ///
+  ///
+  ///
+  final double rangeHighlightScale;
+  final Color rangeHighlightColor;
+  final TextStyle rangeStartTextStyle;
+  final Decoration rangeStartDecoration;
+  final TextStyle rangeEndTextStyle;
+  final Decoration rangeEndDecoration;
+  final TextStyle rangeWithinTextStyle;
+  final Decoration rangeWithinDecoration;
+
+  ///
+  ///
+  ///
+  final CalendarMarker? marker;
+
+  // TODO: to constant values
+  const CalendarStyle({
+    this.dayTextFormatter,
+    this.cellMargin = const EdgeInsets.all(6.0),
+    this.cellPadding = EdgeInsets.zero,
+    this.cellAlignment = Alignment.center,
+    this.cellStackAlignment = Alignment.bottomCenter,
+    this.cellStackClip = Clip.none,
+    this.rowDecoration = const BoxDecoration(),
+    this.tableBorder = const TableBorder(),
+    this.tablePadding = EdgeInsets.zero,
+
+    ///
+    ///
+    ///
+    this.todayIsHighlighted = true,
     this.todayTextStyle = const TextStyle(
       color: Color(0xFFFAFAFA),
       fontSize: 16.0,
@@ -321,24 +316,6 @@ class CalendarStyle {
       color: Color(0xFF5C6BC0),
       shape: BoxShape.circle,
     ),
-    this.rangeStartTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeStartDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.rangeEndTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeEndDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.withinRangeTextStyle = const TextStyle(),
-    this.withinRangeDecoration = const BoxDecoration(shape: BoxShape.circle),
     this.outsideTextStyle = const TextStyle(color: Color(0xFFAEAEAE)),
     this.outsideDecoration = const BoxDecoration(shape: BoxShape.circle),
     this.disabledTextStyle = const TextStyle(color: Color(0xFFBFBFBF)),
@@ -358,29 +335,32 @@ class CalendarStyle {
     ),
     this.defaultTextStyle = const TextStyle(),
     this.defaultDecoration = const BoxDecoration(shape: BoxShape.circle),
-    this.rowDecoration = const BoxDecoration(),
-    this.tableBorder = const TableBorder(),
-    this.tablePadding = EdgeInsets.zero,
-    this.dayTextFormatter,
+
+    ///
+    ///
+    ///
+    this.rangeHighlightScale = 1.0,
+    this.rangeHighlightColor = const Color(0xFFBBDDFF),
+    this.rangeStartTextStyle = const TextStyle(
+      color: Color(0xFFFAFAFA),
+      fontSize: 16.0,
+    ),
+    this.rangeStartDecoration = const BoxDecoration(
+      color: Color(0xFF6699FF),
+      shape: BoxShape.circle,
+    ),
+    this.rangeEndTextStyle = const TextStyle(
+      color: Color(0xFFFAFAFA),
+      fontSize: 16.0,
+    ),
+    this.rangeEndDecoration = const BoxDecoration(
+      color: Color(0xFF6699FF),
+      shape: BoxShape.circle,
+    ),
+    this.rangeWithinTextStyle = const TextStyle(),
+    this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
+    this.marker,
   });
-}
-
-/// Helper class containing data for internal `Positioned` widget.
-class PositionedOffset {
-  /// Distance from the top edge.
-  final double? top;
-
-  /// Distance from the bottom edge.
-  final double? bottom;
-
-  /// Distance from the leading edge.
-  final double? start;
-
-  /// Distance from the trailing edge.
-  final double? end;
-
-  /// Creates a `PositionedOffset`. Values are set to `null` by default.
-  const PositionedOffset({this.top, this.bottom, this.start, this.end});
 }
 
 /// Class containing styling for `TableCalendar`'s days of week panel.

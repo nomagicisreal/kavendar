@@ -249,11 +249,11 @@ class TableCalendarCell extends StatelessWidget {
             duration: DurationExtension.milli100 * 2.5,
             margin: calendarStyle.cellMargin,
             padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.withinRangeDecoration,
+            decoration: calendarStyle.rangeWithinDecoration,
             alignment: calendarStyle.cellAlignment,
             child: Text(
               calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.withinRangeTextStyle,
+              style: calendarStyle.rangeWithinTextStyle,
             ),
           );
     } else if (isOutside) {

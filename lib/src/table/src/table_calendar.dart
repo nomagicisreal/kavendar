@@ -41,7 +41,10 @@ class TableCalendar<T> extends StatefulWidget {
   final HeaderStyle? headerStyle;
   final DaysOfWeekStyle daysOfWeekStyle;
   final CalendarStyle calendarStyle;
-  final CalendarBuilders<T> calendarBuilders;
+  final CalendarBuilders<T> _calendarBuilders;
+
+  CalendarBuilders<T> get calendarBuilders => _calendarBuilders;
+
   final RangeSelectionMode rangeSelectionMode;
   final bool loadEventsForDisabledDays;
   final List<T> Function(DateTime day)? eventLoader;
@@ -86,7 +89,7 @@ class TableCalendar<T> extends StatefulWidget {
     this.headerStyle = const HeaderStyle(),
     this.daysOfWeekStyle = const DaysOfWeekStyle(),
     this.calendarStyle = const CalendarStyle(),
-    this.calendarBuilders = const CalendarBuilders(),
+    CalendarBuilders<T>? calendarBuilders,
     this.rangeSelectionMode = RangeSelectionMode.toggledOff,
     this.eventLoader,
     this.enabledDayPredicate,
@@ -116,7 +119,8 @@ class TableCalendar<T> extends StatefulWidget {
          start: dm.DateTimeExtension.normalizeDate(firstDay),
          end: dm.DateTimeExtension.normalizeDate(lastDay),
        ),
-       currentDay = currentDay ?? DateTime.now();
+       currentDay = currentDay ?? DateTime.now(),
+       _calendarBuilders = CalendarBuilders(style: calendarStyle);
 
   @override
   State<TableCalendar<T>> createState() => _TableCalendarState<T>();
@@ -194,7 +198,8 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
   ///
   ///
   bool get _shouldBlockOutsideDays =>
-      !widget.calendarStyle.outsideDaysVisible && widget.weeksPerPage == 6;
+      widget.calendarStyle.outsideDecoration == null &&
+      widget.weeksPerPage == 6;
 
   void _onDayTapped(DateTime day) {
     final isOutside = day.month != _focusedDay.value.month;
@@ -285,43 +290,35 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
   }
 
   ///
+  /// a year
   ///
-  ///
-  int _calculateWeekNumber(DateTime date) {
-    final middleDay = date.add(const Duration(days: 3));
-    final dayOfYear = dm.DateTimeExtension.dayOfYear(middleDay);
-    return 1 + ((dayOfYear - 1) / 7).floor();
-  }
-
-  bool _isDayDisabled(DateTime day) =>
-      day.isBefore(widget.domain.start) ||
-      day.isAfter(widget.domain.end) ||
-      !_isDayAvailable(day);
-
-  bool _isDayAvailable(DateTime day) {
-    if (widget.enabledDayPredicate == null) return true;
-    return widget.enabledDayPredicate!(day);
+  bool _isDayDisabled(DateTime day) {
+    if (day.isBefore(widget.domain.start)) return true;
+    if (day.isAfter(widget.domain.end)) return true;
+    final enable = widget.enabledDayPredicate;
+    if (enable == null) return false;
+    return !enable(day);
   }
 
   ///
   ///
   ///
-  Widget _weekNumbersBuilder(DateTime day) {
-    final weekNumber = _calculateWeekNumber(day);
-    return widget.calendarBuilders.weekNumberBuilder?.call(weekNumber) ??
+  Widget _weekNumbersBuilder(DateTime date) {
+    final index = dm.DateTimeExtension.weekYearIndexOf(date);
+    return widget.calendarBuilders.weekYearIndexBuilder?.call(index) ??
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Center(
             child: Text(
-              weekNumber.toString(),
+              index.toString(),
               style: widget.calendarStyle.weekNumberTextStyle,
             ),
           ),
         );
   }
 
-  Widget _dowBuilder(DateTime day) =>
-      widget.calendarBuilders.dowBuilder?.call(day) ??
+  Widget _dayOfWeekBuilder(DateTime day) =>
+      widget.calendarBuilders.dayOfWeekBuilder?.call(day) ??
       Center(
         child: ExcludeSemantics(
           child: Text(
@@ -338,64 +335,6 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
   ///
   ///
   ///
-  Widget _dayBuilderMarkerRowChild(DateTime day, T event, double markerSize) =>
-      widget.calendarBuilders.singleMarkerBuilder?.call(day, event) ??
-      Container(
-        width: markerSize,
-        height: markerSize,
-        margin: widget.calendarStyle.markerMargin,
-        decoration: widget.calendarStyle.markerDecoration,
-      );
-
-  Widget? _dayBuilderMarker(
-    BoxConstraints constraints,
-    DateTime day,
-    List<T>? events,
-  ) {
-    if (events == null) return null;
-    if (events.isEmpty) return null;
-    final center = constraints.maxHeight / 2;
-    final shorterSide = BoxConstraintsExtension.shortSide(constraints);
-
-    final markerSize =
-        widget.calendarStyle.markerSize ??
-        (shorterSide - widget.calendarStyle.cellMargin.vertical) *
-            widget.calendarStyle.markerSizeScale;
-
-    final markerAutoAlignmentTop =
-        center +
-        (shorterSide - widget.calendarStyle.cellMargin.vertical) / 2 -
-        (markerSize * widget.calendarStyle.markersAnchor);
-
-    return PositionedDirectional(
-      top:
-          widget.calendarStyle.markersAutoAligned
-              ? markerAutoAlignmentTop
-              : widget.calendarStyle.markersOffset.top,
-      bottom:
-          widget.calendarStyle.markersAutoAligned
-              ? null
-              : widget.calendarStyle.markersOffset.bottom,
-      start:
-          widget.calendarStyle.markersAutoAligned
-              ? null
-              : widget.calendarStyle.markersOffset.start,
-      end:
-          widget.calendarStyle.markersAutoAligned
-              ? null
-              : widget.calendarStyle.markersOffset.end,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children:
-            events
-                .take(widget.calendarStyle.markersMaxCount)
-                .map(
-                  (event) => _dayBuilderMarkerRowChild(day, event, markerSize),
-                )
-                .toList(),
-      ),
-    );
-  }
 
   Widget? _dayBuilderRangeHighlight(
     BoxConstraints constraints,
@@ -455,13 +394,16 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
     // events marker
     Widget? eventsMarker;
     if (widget.loadEventsForDisabledDays || !isDisabled) {
-      eventsMarker = (widget.calendarBuilders.markerBuilder ??
-          _dayBuilderMarker)(constraints, day, widget.eventLoader?.call(day));
+      eventsMarker = widget.calendarBuilders.markerBuilder(
+        constraints,
+        day,
+        widget.eventLoader?.call(day),
+      );
     }
 
     return Stack(
-      alignment: widget.calendarStyle.cellMarkersAlignment,
-      clipBehavior: widget.calendarStyle.cellMarkersClip,
+      alignment: widget.calendarStyle.cellStackAlignment,
+      clipBehavior: widget.calendarStyle.cellStackClip,
       children: [
         if (rangeHighlight != null) rangeHighlight,
         TableCalendarCell(
@@ -470,7 +412,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
           focusedDay: focusedDay,
           calendarStyle: widget.calendarStyle,
           calendarBuilders: widget.calendarBuilders,
-          isTodayHighlighted: widget.calendarStyle.isTodayHighlighted,
+          isTodayHighlighted: widget.calendarStyle.todayIsHighlighted,
           isToday: DateTimeExtension.predicateSameDate(day, widget.currentDay),
           isSelected: widget.selectedDayPredicate?.call(day) ?? false,
           isRangeStart: isRangeStart,
@@ -634,7 +576,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
       7,
       (index) => SizedBox(
         height: widget.daysOfWeekHeight,
-        child: _dowBuilder(visibleDays[index]),
+        child: _dayOfWeekBuilder(visibleDays[index]),
       ),
     ),
   );
