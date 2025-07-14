@@ -13,6 +13,12 @@ extension DateTimeExtension on DateTime {
   ///
   ///
   ///
+  static bool anyInvalidWeekday(Set<int> days) =>
+      days.any((day) => day < DateTime.monday || day > DateTime.sunday);
+
+  ///
+  ///
+  ///
   static DateTime clamp(
     DateTime value,
     DateTime lowerLimit,
@@ -23,13 +29,32 @@ extension DateTimeExtension on DateTime {
     return value;
   }
 
-  static bool isBeforeMonth(DateTime day1, DateTime day2) =>
+  static bool predicateBefore(
+    DateTime date,
+    DateTime lastDate, [
+    bool inclusive = true,
+  ]) =>
+      date.isBefore(lastDate) ||
+      (inclusive && da.DateTimeExtension.predicateSameDate(date, lastDate));
+
+  static bool predicateAfter(
+    DateTime date,
+    DateTime firstDate, [
+    bool inclusive = true,
+  ]) =>
+      date.isAfter(firstDate) ||
+      (inclusive && da.DateTimeExtension.predicateSameDate(date, firstDate));
+
+  ///
+  ///
+  ///
+  static bool predicateBeforeMonth(DateTime day1, DateTime day2) =>
       day1.year == day2.year ? day1.month < day2.month : day1.isBefore(day2);
 
-  static bool isAfterMonth(DateTime day1, DateTime day2) =>
+  static bool predicateAfterMonth(DateTime day1, DateTime day2) =>
       day1.year == day2.year ? day1.month > day2.month : day1.isBefore(day2);
 
-  static bool isWithin(DateTime day, DateTime start, DateTime end) {
+  static bool predicateWithin(DateTime day, DateTime start, DateTime end) {
     if (da.DateTimeExtension.predicateSameDate(day, start) ||
         da.DateTimeExtension.predicateSameDate(day, end)) {
       return true;

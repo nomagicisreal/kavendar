@@ -7,6 +7,8 @@ part of 'calendar.dart';
 /// [AppendixPosition]
 ///
 /// [BuildContextExtension]
+/// [BoxConstraintsExtension]
+///
 /// [GestureDetectorDragMixin]
 ///
 
@@ -51,7 +53,10 @@ extension DateTimeRangeExtension on DateTimeRange {
     int startingDay = DateTime.sunday,
     int count = 1,
   ]) {
-    final start = dm.DateTimeExtension.firstDateOfWeek(focusedDate, startingDay);
+    final start = dm.DateTimeExtension.firstDateOfWeek(
+      focusedDate,
+      startingDay,
+    );
     return DateTimeRange(
       start: start,
       end: start.add(DurationExtension.day1 * DateTime.daysPerWeek * count),
@@ -78,22 +83,27 @@ extension DateTimeRangeExtension on DateTimeRange {
           .difference(
             dm.DateTimeExtension.lastDateOfWeek(range.end, startingWeekday),
           )
-          .inDays + 1 ~/
-      daysPerScope;
+          .inDays +
+      1 ~/ daysPerScope;
+}
+
+extension BoxConstraintsExtension on BoxConstraints {
+  static double shortSide(BoxConstraints constraints) =>
+      math.min(constraints.maxHeight, constraints.maxWidth);
 }
 
 ///
 ///
 ///
 mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
-  Offset? _dragStart;
-  Offset? _dragCurrentOffset;
+  Offset? dragStart;
+  Offset? dragCurrent;
 
   void onDragStart(DragStartDetails details) =>
-      _dragStart = details.globalPosition;
+      dragStart = details.globalPosition;
 
   ///
-  /// to [OffsetExtension]
+  ///
   ///
   static double verticalDifference(Offset begin, Offset end) =>
       end.dy - begin.dy;
@@ -107,19 +117,26 @@ mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
   static DirectionIn4 horizontalForward(double d) =>
       d > 0 ? DirectionIn4.right : DirectionIn4.left;
 
-  GestureDragUpdateCallback onDragUpdateFrom({
-    bool callbackOnlyOnEnd = true,
-    void Function(Offset begin, Offset end, VoidCallback reset)?
-    continuousCallback,
-  }) => (details) {
-    _dragCurrentOffset = details.globalPosition;
-    if (callbackOnlyOnEnd) return;
+  static ValueChanged<DirectionIn4> onVerticalDrag<I>(
+    List<I> items,
+    I currentItem,
+    ValueChanged<int>? onIndexing,
+  ) => (direction) {
+    if (onIndexing == null) return;
+    return direction == DirectionIn4.top
+        ? onIndexing(math.min(items.indexOf(currentItem) + 1, items.length - 1))
+        : onIndexing(math.max(items.indexOf(currentItem) - 1, 0));
+  };
 
-    final begin = _dragStart;
-    final end = _dragCurrentOffset;
-    if (begin != null && end != null) {
-      continuousCallback!(begin, end, () => _dragStart = end);
-    }
+  ///
+  ///
+  ///
+  GestureDragUpdateCallback onDragUpdateFrom([
+    VoidCallback? continuousCallback,
+  ]) => (details) {
+    dragCurrent = details.globalPosition;
+    if (continuousCallback == null) return;
+    continuousCallback();
   };
 
   GestureDragEndCallback onDragEndFrom({
@@ -128,12 +145,12 @@ mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
     required DirectionIn4 Function(double d) direction,
     required Consumer<DirectionIn4> onDrag,
   }) => (details) {
-    final begin = _dragStart;
-    final end = _dragCurrentOffset;
+    final begin = dragStart;
+    final end = dragCurrent;
     if (begin != null && end != null) {
       final d = difference(begin, end);
       if (d.abs() > threshold) onDrag(direction(d));
     }
-    _dragStart = null;
+    dragStart = null;
   };
 }

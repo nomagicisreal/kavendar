@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 /// [OnDaySelected]
 /// [OnRangeSelected]
 /// [RangeSelectionMode]
+///
 /// [SingleMarkerBuilder]
 /// [MarkerBuilder]
 /// [HighlightBuilder]
@@ -19,10 +20,25 @@ import 'package:flutter/material.dart';
 typedef OnDaySelected =
     void Function(DateTime selectedDay, DateTime focusedDay);
 
+typedef OnPageChanged = void Function(int index, DateTime focusedDay);
+
 typedef OnRangeSelected =
     void Function(DateTime? start, DateTime? end, DateTime focusedDay);
 
-enum RangeSelectionMode { disabled, toggledOff, toggledOn, enforced }
+enum RangeSelectionMode {
+  disabled,
+  toggledOff,
+  toggledOn,
+  enforced;
+
+  bool get isToggleAble =>
+      this == RangeSelectionMode.toggledOn ||
+      this == RangeSelectionMode.toggledOff;
+
+  bool get isSelectionOn =>
+      this == RangeSelectionMode.toggledOn ||
+      this == RangeSelectionMode.enforced;
+}
 
 ///
 ///
@@ -33,31 +49,46 @@ typedef FocusedDayBuilder = Widget? Function(DateTime day, DateTime focusedDay);
 
 typedef TextFormatter = String Function(DateTime date, dynamic locale);
 
-enum AvailableGestures { none, verticalSwipe, horizontalSwipe, all }
+enum AvailableScroll {
+  none,
+  onlyVertical,
+  onlyHorizontal,
+  both;
 
-enum CalendarFormat { month, twoWeeks, week }
+  static const ScrollPhysics pageScrollPhysics = PageScrollPhysics();
+  static const ScrollPhysics neverScroll = NeverScrollableScrollPhysics();
+
+  bool get canScrollHorizontal =>
+      this == AvailableScroll.both || this == AvailableScroll.onlyHorizontal;
+
+  bool get canScrollVertical =>
+      this == AvailableScroll.both || this == AvailableScroll.onlyVertical;
+
+  ScrollPhysics get scrollPhysicsVertical => switch (this) {
+    AvailableScroll.none || AvailableScroll.onlyHorizontal => neverScroll,
+    AvailableScroll.onlyVertical || AvailableScroll.both => pageScrollPhysics,
+  };
+
+  ScrollPhysics get scrollPhysicsHorizontal => switch (this) {
+    AvailableScroll.none || AvailableScroll.onlyVertical => neverScroll,
+    AvailableScroll.onlyHorizontal || AvailableScroll.both => pageScrollPhysics,
+  };
+}
 
 ///
 ///
 ///
 ///
 
-/// Signature for a function that creates a single event marker for a given `day`.
-/// Contains a single `event` associated with that `day`.
-typedef SingleMarkerBuilder<T> =
-    Widget? Function(BuildContext context, DateTime day, T event);
+typedef ConstraintsBuilder =
+    Widget Function(BuildContext context, BoxConstraints constraints);
 
-/// Signature for a function that creates an event marker for a given `day`.
-/// Contains a list of `events` associated with that `day`.
+typedef HighlightBuilder = Widget? Function(DateTime day);
+
+typedef SingleMarkerBuilder<T> = Widget? Function(DateTime day, T event);
+
 typedef MarkerBuilder<T> =
-    Widget? Function(BuildContext context, DateTime day, List<T> events);
-
-/// Signature for a function that creates a background highlight for a given `day`.
-///
-/// Used for highlighting current range selection.
-/// Contains a value determining if the given `day` falls within the selected range.
-typedef HighlightBuilder =
-    Widget? Function(BuildContext context, DateTime day, bool isWithinRange);
+    Widget? Function(BoxConstraints constraints, DateTime day, List<T>? events);
 
 ///
 ///
@@ -105,16 +136,8 @@ class CalendarBuilders<T> {
 
 /// Class containing styling and configuration for `TableCalendar`'s content.
 class CalendarStyle {
-  /// Maximum amount of single event marker dots to be displayed.
   final int markersMaxCount;
-
-  /// Specifies if event markers rendered for a day cell can overflow cell's boundaries.
-  /// * `true` - Event markers will be drawn over the cell boundaries
-  /// * `false` - Event markers will be clipped if they are too big
-  final bool canMarkersOverflow;
-
-  /// Determines if single event marker dots should be aligned automatically with `markersAnchor`.
-  /// If `false`, `markersOffset` will be used instead.
+  final Clip cellMarkersClip;
   final bool markersAutoAligned;
 
   /// Specifies the anchor point of single event markers if `markersAutoAligned` is `true`.
@@ -138,7 +161,7 @@ class CalendarStyle {
 
   /// General `Alignment` for event markers.
   /// Will have no effect on markers if `markersAutoAligned` or `markersOffset` is used.
-  final AlignmentGeometry markersAlignment;
+  final AlignmentGeometry cellMarkersAlignment;
 
   /// Decoration of single event markers. Affects each marker dot.
   final Decoration markerDecoration;
@@ -263,7 +286,7 @@ class CalendarStyle {
   /// Creates a `CalendarStyle` used by `TableCalendar` widget.
   const CalendarStyle({
     this.isTodayHighlighted = true,
-    this.canMarkersOverflow = true,
+    this.cellMarkersClip = Clip.none,
     this.outsideDaysVisible = true,
     this.markersAutoAligned = true,
     this.markerSize,
@@ -271,7 +294,7 @@ class CalendarStyle {
     this.markersAnchor = 0.7,
     this.rangeHighlightScale = 1.0,
     this.markerMargin = const EdgeInsets.symmetric(horizontal: 0.3),
-    this.markersAlignment = Alignment.bottomCenter,
+    this.cellMarkersAlignment = Alignment.bottomCenter,
     this.markersMaxCount = 4,
     this.cellMargin = const EdgeInsets.all(6.0),
     this.cellPadding = EdgeInsets.zero,
@@ -392,9 +415,11 @@ class DaysOfWeekStyle {
 
 /// Class containing styling and configuration of `TableCalendar`'s header.
 class HeaderStyle {
+  final void Function(int weeksPerPage)? onFormatChanged;
+  final void Function(DateTime focusedDay)? onTap;
+  final void Function(DateTime focusedDay)? onLongPress;
   final bool titleCentered;
   final bool formatButtonShowsNext;
-  final void Function(int weeksPerPage)? onFormatChanged;
   final TextFormatter? titleTextFormatter;
   final TextStyle titleTextStyle;
 
@@ -448,9 +473,11 @@ class HeaderStyle {
 
   /// Creates a `HeaderStyle` used by `TableCalendar` widget.
   const HeaderStyle({
+    this.onFormatChanged,
+    this.onTap,
+    this.onLongPress,
     this.titleCentered = false,
     this.formatButtonShowsNext = true,
-    this.onFormatChanged,
     this.titleTextFormatter,
     this.titleTextStyle = const TextStyle(fontSize: 17.0),
     this.formatButtonTextStyle = const TextStyle(fontSize: 14.0),

@@ -14,32 +14,30 @@ import 'calendar_style.dart';
 ///
 class TableCalendarHeader extends StatelessWidget {
   final dynamic locale;
-  final DateTime focusedMonth;
+  final DateTime focusedDay;
   final int weeksPerPage;
-  final HeaderStyle headerStyle;
+  final HeaderStyle? headerStyle;
   final VoidCallback onLeftChevronTap;
   final VoidCallback onRightChevronTap;
-  final VoidCallback onHeaderTap;
-  final VoidCallback onHeaderLongPress;
-  final Map<int, String> availableCalendarFormats;
+  final List<int> availableWeeksPerPage;
   final DayBuilder? headerTitleBuilder;
 
   const TableCalendarHeader({
     super.key,
     this.locale,
-    required this.focusedMonth,
+    required this.focusedDay,
     required this.weeksPerPage,
     required this.headerStyle,
     required this.onLeftChevronTap,
     required this.onRightChevronTap,
-    required this.onHeaderTap,
-    required this.onHeaderLongPress,
-    required this.availableCalendarFormats,
+    required this.availableWeeksPerPage,
     this.headerTitleBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
+    final headerStyle = this.headerStyle;
+    if (headerStyle == null) return Container();
     final onFormatChange = headerStyle.onFormatChanged;
     return Container(
       decoration: headerStyle.decoration,
@@ -61,16 +59,13 @@ class TableCalendarHeader extends StatelessWidget {
             ),
           Expanded(
             child:
-                headerTitleBuilder?.call(focusedMonth) ??
+                headerTitleBuilder?.call(focusedDay) ??
                 GestureDetector(
-                  onTap: onHeaderTap,
-                  onLongPress: onHeaderLongPress,
+                  onTap: () => headerStyle.onTap?.call(focusedDay),
+                  onLongPress: () => headerStyle.onLongPress?.call(focusedDay),
                   child: Text(
-                    headerStyle.titleTextFormatter?.call(
-                          focusedMonth,
-                          locale,
-                        ) ??
-                        DateFormat.yMMMM(locale).format(focusedMonth),
+                    headerStyle.titleTextFormatter?.call(focusedDay, locale) ??
+                        DateFormat.yMMMM(locale).format(focusedDay),
                     style: headerStyle.titleTextStyle,
                     textAlign:
                         headerStyle.titleCentered
@@ -79,8 +74,7 @@ class TableCalendarHeader extends StatelessWidget {
                   ),
                 ),
           ),
-          if (onFormatChange != null &&
-              availableCalendarFormats.length > 1)
+          if (onFormatChange != null && availableWeeksPerPage.length > 1)
             Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: InkWell(
@@ -91,9 +85,7 @@ class TableCalendarHeader extends StatelessWidget {
                   decoration: headerStyle.formatButtonDecoration,
                   padding: headerStyle.formatButtonPadding,
                   child: Text(
-                    headerStyle.formatButtonShowsNext
-                        ? availableCalendarFormats[_nextFormat]!
-                        : availableCalendarFormats[weeksPerPage]!,
+                    "${headerStyle.formatButtonShowsNext ? _nextFormat : weeksPerPage} weeks",
                     style: headerStyle.formatButtonTextStyle,
                   ),
                 ),
@@ -117,10 +109,9 @@ class TableCalendarHeader extends StatelessWidget {
   }
 
   int get _nextFormat {
-    final formats = availableCalendarFormats.keys.toList();
-    int id = formats.indexOf(weeksPerPage);
-    id = (id + 1) % formats.length;
-    return formats[id];
+    int id = availableWeeksPerPage.indexOf(weeksPerPage);
+    id = (id + 1) % availableWeeksPerPage.length;
+    return availableWeeksPerPage[id];
   }
 }
 
