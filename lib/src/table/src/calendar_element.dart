@@ -1,10 +1,5 @@
-import 'package:damath/damath.dart';
-import 'package:datter/datter.dart';
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:kavendar/src/table/table_calendar.dart';
-
-import 'calendar_style.dart';
+// ignore_for_file: constant_identifier_names
+part of '../table_calendar.dart';
 
 ///
 ///
@@ -14,18 +9,18 @@ import 'calendar_style.dart';
 ///
 class TableCalendarHeader extends StatelessWidget {
   final dynamic locale;
-  final DateTime focusedDay;
+  final DateTime focusedDate;
   final int weeksPerPage;
   final HeaderStyle? headerStyle;
   final VoidCallback onLeftChevronTap;
   final VoidCallback onRightChevronTap;
   final List<int> availableWeeksPerPage;
-  final DayBuilder? headerTitleBuilder;
+  final DateBuilder? headerTitleBuilder;
 
   const TableCalendarHeader({
     super.key,
     this.locale,
-    required this.focusedDay,
+    required this.focusedDate,
     required this.weeksPerPage,
     required this.headerStyle,
     required this.onLeftChevronTap,
@@ -41,8 +36,8 @@ class TableCalendarHeader extends StatelessWidget {
     final onFormatChange = headerStyle.onFormatChanged;
     return Container(
       decoration: headerStyle.decoration,
-      margin: headerStyle.headerMargin,
-      padding: headerStyle.headerPadding,
+      margin: headerStyle.margin,
+      padding: headerStyle.padding,
       child: Row(
         children: [
           if (headerStyle.leftChevronVisible)
@@ -59,13 +54,13 @@ class TableCalendarHeader extends StatelessWidget {
             ),
           Expanded(
             child:
-                headerTitleBuilder?.call(focusedDay) ??
+                headerTitleBuilder?.call(focusedDate) ??
                 GestureDetector(
-                  onTap: () => headerStyle.onTap?.call(focusedDay),
-                  onLongPress: () => headerStyle.onLongPress?.call(focusedDay),
+                  onTap: () => headerStyle.onTap?.call(focusedDate),
+                  onLongPress: () => headerStyle.onLongPress?.call(focusedDate),
                   child: Text(
-                    headerStyle.titleTextFormatter?.call(focusedDay, locale) ??
-                        DateFormat.yMMMM(locale).format(focusedDay),
+                    headerStyle.titleTextFormatter?.call(focusedDate, locale) ??
+                        DateFormat.yMMMM(locale).format(focusedDate),
                     style: headerStyle.titleTextStyle,
                     textAlign:
                         headerStyle.titleCentered
@@ -115,179 +110,72 @@ class TableCalendarHeader extends StatelessWidget {
   }
 }
 
+///
+///
+///
+enum TableCalendarCellType {
+  weekday,
+  weekend,
+  outside,
+  today,
+  holiday,
+  disabled,
+  highlighted,
+  selected,
+  rangeStart,
+  rangeWithin,
+  rangeEnd;
+
+  bool? get rangeHighlightState => switch (this) {
+    TableCalendarCellType.rangeStart => true,
+    TableCalendarCellType.rangeEnd => false,
+    TableCalendarCellType.rangeWithin => null,
+    _ => throw StateError(message_noHighlight),
+  };
+
+  static const String message_noHighlight = 'cell type no range highlight';
+}
+
+typedef StyleLocaleWidgetBuilder<T> = Widget Function(T style, dynamic locale);
+
 class TableCalendarCell extends StatelessWidget {
   final dynamic locale;
-  final DateTime day;
-  final DateTime focusedDay;
-  final bool isTodayHighlighted;
-  final bool isToday;
-  final bool isSelected;
-  final bool isRangeStart;
-  final bool isRangeEnd;
-  final bool isWithinRange;
-  final bool isOutside;
-  final bool isDisabled;
-  final bool isHoliday;
-  final bool isWeekend;
-  final CalendarStyle calendarStyle;
-  final CalendarBuilders calendarBuilders;
+  final DateTime date;
+  final DateTime focusedDate;
+  final CalendarStyle style;
+  final TableCalendarCellType cellType;
 
   const TableCalendarCell({
     super.key,
-    required this.day,
-    required this.focusedDay,
-    required this.calendarStyle,
-    required this.calendarBuilders,
-    required this.isTodayHighlighted,
-    required this.isToday,
-    required this.isSelected,
-    required this.isRangeStart,
-    required this.isRangeEnd,
-    required this.isWithinRange,
-    required this.isOutside,
-    required this.isDisabled,
-    required this.isHoliday,
-    required this.isWeekend,
     this.locale,
+    required this.date,
+    required this.focusedDate,
+    required this.style,
+    required this.cellType,
   });
 
   @override
   Widget build(BuildContext context) {
-    final dowLabel = DateFormat.EEEE(locale).format(day);
-    final dayLabel = DateFormat.yMMMMd(locale).format(day);
     return Semantics(
-      label: '$dowLabel, $dayLabel',
+      label:
+          '${DateFormat.EEEE(locale).format(date)}, '
+          '${DateFormat.yMMMMd(locale).format(date)}',
       excludeSemantics: true,
       child:
-          calendarBuilders.prioritizedBuilder?.call(day, focusedDay) ??
-          cellOf(context),
+          style.builderPrioritized?.call(date, focusedDate, locale) ??
+          switch (cellType) {
+            TableCalendarCellType.weekday => style.builderWeekday,
+            TableCalendarCellType.weekend => style.builderWeekend,
+            TableCalendarCellType.outside => style.builderOutside,
+            TableCalendarCellType.today => style.builderToday,
+            TableCalendarCellType.holiday => style.builderHoliday,
+            TableCalendarCellType.disabled => style.builderDisabled,
+            TableCalendarCellType.highlighted => throw UnimplementedError(),
+            TableCalendarCellType.selected => style.builderSelected,
+            TableCalendarCellType.rangeStart => style.builderRangeStart,
+            TableCalendarCellType.rangeWithin => style.builderRangeIn,
+            TableCalendarCellType.rangeEnd => style.builderRangeEnd,
+          }(date, focusedDate, locale),
     );
-  }
-
-  Widget cellOf(BuildContext context) {
-    if (isDisabled) {
-      return calendarBuilders.disabledBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.disabledDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.disabledTextStyle,
-            ),
-          );
-    } else if (isSelected) {
-      return calendarBuilders.selectedBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.selectedDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.selectedTextStyle,
-            ),
-          );
-    } else if (isRangeStart) {
-      return calendarBuilders.rangeStartBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.rangeStartDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.rangeStartTextStyle,
-            ),
-          );
-    } else if (isRangeEnd) {
-      return calendarBuilders.rangeEndBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.rangeEndDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.rangeEndTextStyle,
-            ),
-          );
-    } else if (isToday && isTodayHighlighted) {
-      return calendarBuilders.todayBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.todayDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.todayTextStyle,
-            ),
-          );
-    } else if (isHoliday) {
-      return calendarBuilders.holidayBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.holidayDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.holidayTextStyle,
-            ),
-          );
-    } else if (isWithinRange) {
-      return calendarBuilders.withinRangeBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.rangeWithinDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.rangeWithinTextStyle,
-            ),
-          );
-    } else if (isOutside) {
-      return calendarBuilders.outsideBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration: calendarStyle.outsideDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style: calendarStyle.outsideTextStyle,
-            ),
-          );
-    } else {
-      return calendarBuilders.defaultBuilder?.call(day, focusedDay) ??
-          AnimatedContainer(
-            duration: DurationExtension.milli100 * 2.5,
-            margin: calendarStyle.cellMargin,
-            padding: calendarStyle.cellPadding,
-            decoration:
-                isWeekend
-                    ? calendarStyle.weekendDecoration
-                    : calendarStyle.defaultDecoration,
-            alignment: calendarStyle.cellAlignment,
-            child: Text(
-              calendarStyle.dayTextFormatter?.call(day, locale) ?? '${day.day}',
-              style:
-                  isWeekend
-                      ? calendarStyle.weekendTextStyle
-                      : calendarStyle.defaultTextStyle,
-            ),
-          );
-    }
   }
 }

@@ -1,16 +1,17 @@
 part of 'calendar.dart';
 
 ///
+/// [StyleWidgetBuilder], ...
+/// [ResponsiveShape], ...
+/// [BuildContextExtension], ...
+/// [GestureDetectorDragMixin], ...
 ///
-/// [ResponsiveShape]
-/// [ScrollWay]
-/// [AppendixPosition]
-///
-/// [BuildContextExtension]
-/// [BoxConstraintsExtension]
-///
-/// [GestureDetectorDragMixin]
-///
+
+typedef ConstraintsBuilder =
+    Widget Function(BuildContext context, BoxConstraints constraints);
+typedef StyleWidgetBuilder<T> = Widget Function(T style);
+typedef StylePositionedLayout<T> =
+    PositionedOffset Function(T style, BoxConstraints constraints);
 
 ///
 ///

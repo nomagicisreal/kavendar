@@ -1,6 +1,46 @@
 import 'package:damath/damath.dart' as da;
 
-// DirectionIn4 -> ltrb
+///
+/// DirectionIn4 -> ltrb
+///
+/// [TextFormatter], ...
+/// [IterableExt], ...
+/// [DateTimeExtension], ...
+///
+///
+///
+
+typedef TextFormatter = String Function(DateTime date, dynamic locale);
+
+// ltrb (left, top, right, bottom) or (start, top, right, bottom)
+typedef PositionedOffset = (double?, double?, double?, double?);
+
+///
+///
+///
+extension IterableExt on Iterable {
+  static Iterable<S> mapNotNull<I, S>(
+    Iterable<I> iterable,
+    da.Mapper<I, S?> mapper,
+  ) sync* {
+    for (final item in iterable) {
+      final value = mapper(item);
+      if (value == null) continue;
+      yield value;
+    }
+  }
+
+  static List<S> mapToListNotNull<I, S>(
+    Iterable<I> iterable,
+    da.Mapper<I, S?> mapper,
+  ) {
+    final list = <S>[];
+    for (final item in iterable) {
+      list.addIfNotNull(mapper(item));
+    }
+    return list;
+  }
+}
 
 ///
 ///
@@ -126,10 +166,10 @@ extension DateTimeExtension on DateTime {
     date,
   ).add(da.DurationExtension.day1 * ((startingDay - 1 - date.weekday) % 7));
 
-  static int monthRowsOf(DateTime date, [int startingDay = DateTime.sunday]) =>
-      (1 +
-          firstDateOfWeekInMonth(
-            date,
-          ).difference(lastDateOfWeekInMonth(date, startingDay)).inDays) ~/
-      7;
+  // static int monthRowsOf(DateTime date, [int startingDay = DateTime.sunday]) =>
+  //     (1 +
+  //         firstDateOfWeekInMonth(
+  //           date,
+  //         ).difference(lastDateOfWeekInMonth(date, startingDay)).inDays) ~/
+  //     7;
 }
