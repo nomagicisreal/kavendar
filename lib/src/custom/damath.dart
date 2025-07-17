@@ -1,7 +1,8 @@
 import 'package:damath/damath.dart' as da;
 
 ///
-/// DirectionIn4 -> ltrb
+/// DirectionIn4 -> ltrb,
+/// predicate same date -> not null
 ///
 /// [TextFormatter], ...
 /// [IterableExt], ...
@@ -113,6 +114,11 @@ extension DateTimeExtension on DateTime {
 
   static bool predicateAfterMonth(DateTime day1, DateTime day2) =>
       day1.year == day2.year ? day1.month > day2.month : day1.isBefore(day2);
+
+  static bool predicateIn(DateTime day, DateTime start, DateTime end) {
+    if (day.isAfter(start) && day.isBefore(end)) return true;
+    return false;
+  }
 
   static bool predicateWithin(DateTime day, DateTime start, DateTime end) {
     if (da.DateTimeExtension.predicateSameDate(day, start) ||

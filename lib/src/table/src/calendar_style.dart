@@ -6,10 +6,8 @@ part of '../table_calendar.dart';
 /// [EventBuilder], ...
 /// [RangeSelectionMode], ...
 ///
-/// [CalendarStyle]
-/// [CalendarStyleCellMarker]
-/// [DaysOfWeekStyle]
-/// [HeaderStyle]
+/// [CalendarFormatPage], ...
+/// [DaysOfWeekStyle], ...
 ///
 ///
 
@@ -45,7 +43,9 @@ typedef RangeHighlightBuilder =
 typedef EventBuilder<T> = Widget? Function(DateTime dateTime, T event);
 
 typedef EventsBuilder<T> =
-    Widget? Function(DateTime dateTime, List<T>? events, EventBuilder<T> mark);
+    Widget? Function(DateTime dateTime, List<T> events, EventBuilder<T> mark);
+
+typedef StyleLocaleWidgetBuilder<T> = Widget Function(T style, dynamic locale);
 
 ///
 ///
@@ -53,12 +53,12 @@ typedef EventsBuilder<T> =
 typedef EventMark<T> =
     EventBuilder<T> Function(
       BoxConstraints constraints,
-      CalendarStyleCellMarker style,
+      CalendarStyleCellMark style,
     );
 typedef EventsLayoutMark<T> =
     EventsBuilder<T> Function(
       BoxConstraints constraints,
-      CalendarStyleCellMarker style,
+      CalendarStyleCellMark style,
     );
 
 ///
@@ -108,32 +108,34 @@ enum AvailableScroll {
 ///
 ///
 ///
-class CalendarStyleCellMarker {
+class CalendarStyleCellMark {
   final int max;
+  final bool forDisable;
   final double? size;
   final double sizeScale;
   final double sizeAnchor;
   final EdgeInsets margin;
   final EdgeInsets marginCell;
   final Decoration decoration;
-  final StylePositionedLayout<CalendarStyleCellMarker> childrenPosition;
+  final StylePositionedLayout<CalendarStyleCellMark> childrenPosition;
 
-  const CalendarStyleCellMarker({
+  const CalendarStyleCellMark({
+    this.max = 4,
+    this.forDisable = true,
     this.size,
-    this.childrenPosition = _position,
     this.sizeScale = 0.2,
     this.sizeAnchor = 0.7,
     this.marginCell = EdgeInsets.zero,
     this.margin = const EdgeInsets.symmetric(horizontal: 0.3),
-    this.max = 4,
     this.decoration = const BoxDecoration(
       color: Color(0xFF263238),
       shape: BoxShape.circle,
     ),
+    this.childrenPosition = _position,
   });
 
   static dm.PositionedOffset _position(
-    CalendarStyleCellMarker style,
+    CalendarStyleCellMark style,
     BoxConstraints constraints,
   ) {
     final shorterSide = BoxConstraintsExtension.shortSide(constraints);
@@ -152,7 +154,7 @@ class CalendarStyleCellMarker {
 
   static EventBuilder<T> _singleDecoration<T>(
     BoxConstraints constraints,
-    CalendarStyleCellMarker style,
+    CalendarStyleCellMark style,
   ) =>
       (day, event) => Container(
         width: style.size,
@@ -163,9 +165,8 @@ class CalendarStyleCellMarker {
 
   static EventsBuilder<T> _eventsAsPositionedRow<T>(
     BoxConstraints constraints,
-    CalendarStyleCellMarker style,
+    CalendarStyleCellMark style,
   ) => (dateTime, events, mark) {
-    if (events == null) return null;
     if (events.isEmpty) return null;
     final position = style.childrenPosition(style, constraints);
     return PositionedDirectional(
@@ -190,11 +191,22 @@ class CalendarStyleCellMarker {
 /// [rangeHighlightScale], ...
 ///
 class CalendarStyle {
+  ///
+  ///
+  ///
   final dm.TextFormatter? dayTextFormatter;
   final DaysOfWeekStyle? daysOfWeekStyle;
-  final PagingDateTime? paging;
+  final bool weekNumberVisible;
+
+  // final CalendarFormatPage format;
   final int weeksPerPage;
   final Set<int> weekendDays;
+  final int startingWeekday;
+  final PagingDateTime? paging;
+
+  ///
+  ///
+  ///
   final EdgeInsets cellMargin;
   final EdgeInsets cellPadding;
   final AlignmentGeometry cellAlignment;
@@ -209,7 +221,6 @@ class CalendarStyle {
   ///
   ///
   ///
-  final bool weekNumberVisible;
   final TextStyle? weekNumberTextStyle;
   final TextStyle? todayTextStyle;
   final Decoration todayDecoration;
@@ -230,20 +241,20 @@ class CalendarStyle {
   ///
   ///
   final CellBuilder? builderPrioritized;
-  final CellBuilder? _builderWeekday;
-  final CellBuilder? _builderWeekend;
-  final CellBuilder? _builderOutside;
-  final CellBuilder? _builderToday;
-  final CellBuilder? _builderHoliday;
-  final CellBuilder? _builderDisabled;
-  final CellBuilder? _builderSelected;
-  final CellBuilder? _builderRangeStart;
-  final CellBuilder? _builderRangeIn;
-  final CellBuilder? _builderRangeEnd;
-  final CellBuilder? _builderDayOfWeek;
+  final CellBuilder? _bWeekday;
+  final CellBuilder? _bWeekend;
+  final CellBuilder? _bOutside;
+  final CellBuilder? _bToday;
+  final CellBuilder? _bHoliday;
+  final CellBuilder? _bDisabled;
+  final CellBuilder? _bSelected;
+  final CellBuilder? _bRangeStart;
+  final CellBuilder? _bRangeIn;
+  final CellBuilder? _bRangeEnd;
+  final CellBuilder? _bDayOfWeek;
+  final RangeHighlightBuilder? _bRangeHighlight; // highlight builder ??
+  final Generator<Widget>? _bWeekNumber;
   final DateBuilder? builderHeaderTitle;
-  final RangeHighlightBuilder? _builderRangeHighlight; // highlight builder ??
-  final Generator<Widget>? _builderWeekNumber;
 
   ///
   ///
@@ -260,12 +271,19 @@ class CalendarStyle {
   const CalendarStyle({
     this.dayTextFormatter,
     this.daysOfWeekStyle,
+    this.weekNumberVisible = true,
     this.weekendDays = const {
       DateTime.saturday,
       DateTime.sunday,
     }, // ignore invalid weekend integer
+    // this.format = CalendarFormatPage.month,
     this.weeksPerPage = 6,
+    this.startingWeekday = DateTime.sunday,
     this.paging,
+
+    ///
+    ///
+    ///
     this.cellMargin = const EdgeInsets.all(6.0),
     this.cellPadding = EdgeInsets.zero,
     this.cellAlignment = Alignment.center,
@@ -280,7 +298,6 @@ class CalendarStyle {
     ///
     ///
     ///
-    this.weekNumberVisible = true,
     this.weekNumberTextStyle = const TextStyle(
       fontSize: 12,
       color: Color(0xFFBFBFBF),
@@ -359,21 +376,141 @@ class CalendarStyle {
     this.builderHeaderTitle,
     RangeHighlightBuilder? builderRangeHighlight,
     Generator<Widget>? builderWeekNumber,
-  }) : _builderWeekday = builderWeekday,
-       _builderWeekend = builderWeekend,
-       _builderOutside = builderOutside,
-       _builderToday = builderToday,
-       _builderHoliday = builderHoliday,
-       _builderDisabled = builderDisabled,
-       _builderSelected = builderSelected,
-       _builderRangeStart = builderRangeStart,
-       _builderRangeIn = builderRangeIn,
-       _builderRangeEnd = builderRangeEnd,
-       _builderDayOfWeek = builderDayOfWeek,
-       _builderRangeHighlight = builderRangeHighlight,
-       _builderWeekNumber = builderWeekNumber;
+  }) : _bWeekday = builderWeekday,
+       _bWeekend = builderWeekend,
+       _bOutside = builderOutside,
+       _bToday = builderToday,
+       _bHoliday = builderHoliday,
+       _bDisabled = builderDisabled,
+       _bSelected = builderSelected,
+       _bRangeStart = builderRangeStart,
+       _bRangeIn = builderRangeIn,
+       _bRangeEnd = builderRangeEnd,
+       _bDayOfWeek = builderDayOfWeek,
+       _bRangeHighlight = builderRangeHighlight,
+       _bWeekNumber = builderWeekNumber;
 
-  static Generator<Widget> _bWeekNumber(CalendarStyle style) =>
+  ///
+  ///
+  ///
+  static Widget _b({
+    required CalendarStyle style,
+    required Decoration? decoration,
+    required String text,
+    required TextStyle? textStyle,
+  }) => AnimatedContainer(
+    duration: style.cellAnimationDuration,
+    margin: style.cellMargin,
+    padding: style.cellPadding,
+    decoration: decoration,
+    alignment: style.cellAlignment,
+    child: Text(text, style: textStyle),
+  );
+
+  static CellBuilder _builderWeekday(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.weekdayDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.weekdayTextStyle,
+      );
+
+  static CellBuilder _builderWeekend(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.weekendDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.weekendTextStyle,
+      );
+
+  static CellBuilder _builderOutside(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.outsideDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.outsideTextStyle,
+      );
+
+  static CellBuilder _builderToday(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.todayDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.todayTextStyle,
+      );
+
+  static CellBuilder _builderHoliday(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.holidayDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.holidayTextStyle,
+      );
+
+  static CellBuilder _builderDisabled(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.disabledDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.disabledTextStyle,
+      );
+
+  static CellBuilder _builderSelected(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.selectedDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.selectedTextStyle,
+      );
+
+  static CellBuilder _builderRangeWithin(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.rangeWithinDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.rangeWithinTextStyle,
+      );
+
+  static CellBuilder _builderRangeEnd(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.rangeEndDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.rangeEndTextStyle,
+      );
+
+  static CellBuilder _builderRangeStart(CalendarStyle style) =>
+      (date, _, locale) => _b(
+        style: style,
+        decoration: style.rangeStartDecoration,
+        text: style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
+        textStyle: style.rangeStartTextStyle,
+      );
+
+  CellBuilder get builderRangeStart => _bRangeStart ?? _builderRangeStart(this);
+
+  CellBuilder get builderRangeIn => _bRangeIn ?? _builderRangeWithin(this);
+
+  CellBuilder get builderRangeEnd => _bRangeEnd ?? _builderRangeEnd(this);
+
+  CellBuilder get builderSelected => _bSelected ?? _builderSelected(this);
+
+  CellBuilder get builderDisabled => _bDisabled ?? _builderDisabled(this);
+
+  CellBuilder get builderHoliday => _bHoliday ?? _builderHoliday(this);
+
+  CellBuilder get builderToday => _bToday ?? _builderToday(this);
+
+  CellBuilder get builderOutside => _bOutside ?? _builderOutside(this);
+
+  CellBuilder get builderWeekend => _bWeekend ?? _builderWeekend(this);
+
+  CellBuilder get builderWeekday => _bWeekday ?? _builderWeekday(this);
+
+  ///
+  ///
+  ///
+  static Generator<Widget> _builderWeekNumber(CalendarStyle style) =>
       (index) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Center(
@@ -381,7 +518,7 @@ class CalendarStyle {
         ),
       );
 
-  static CellBuilder _bDayOfWeek(CalendarStyle style) {
+  static CellBuilder _builderDayOfWeek(CalendarStyle style) {
     final daysOfWeekStyle = style.daysOfWeekStyle!;
     return (date, _, locale) => Center(
       child: ExcludeSemantics(
@@ -396,7 +533,7 @@ class CalendarStyle {
     );
   }
 
-  static RangeHighlightBuilder _bRangeHighlight(CalendarStyle style) =>
+  static RangeHighlightBuilder _builderHighlightRange(CalendarStyle style) =>
       (date, range, constraints) => Center(
         child: Container(
           margin: EdgeInsetsDirectional.only(
@@ -411,151 +548,15 @@ class CalendarStyle {
         ),
       );
 
-  ///
-  ///
-  ///
-  static Widget _b({
-    required CalendarStyle style,
-    required Decoration? decoration,
-    required Text child,
-  }) => AnimatedContainer(
-    duration: style.cellAnimationDuration,
-    margin: style.cellMargin,
-    padding: style.cellPadding,
-    decoration: decoration,
-    alignment: style.cellAlignment,
-    child: child,
-  );
+  CellBuilder get builderDayOfWeek => _bDayOfWeek ?? _builderDayOfWeek(this);
 
-  static CellBuilder _bWeekday(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.weekdayDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.weekdayTextStyle,
-        ),
-      );
-
-  static CellBuilder _bWeekend(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.weekendDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.weekendTextStyle,
-        ),
-      );
-
-  static CellBuilder _bOutside(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.outsideDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.outsideTextStyle,
-        ),
-      );
-
-  static CellBuilder _bToday(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.todayDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.todayTextStyle,
-        ),
-      );
-
-  static CellBuilder _bHoliday(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.holidayDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.holidayTextStyle,
-        ),
-      );
-
-  static CellBuilder _bDisabled(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.disabledDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.disabledTextStyle,
-        ),
-      );
-
-  static CellBuilder _bSelected(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.selectedDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.selectedTextStyle,
-        ),
-      );
-
-  static CellBuilder _bRangeWithin(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.rangeWithinDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.rangeWithinTextStyle,
-        ),
-      );
-
-  static CellBuilder _bRangeEnd(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.rangeEndDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.rangeEndTextStyle,
-        ),
-      );
-
-  static CellBuilder _bRangeStart(CalendarStyle style) =>
-      (date, _, locale) => _b(
-        style: style,
-        decoration: style.rangeStartDecoration,
-        child: Text(
-          style.dayTextFormatter?.call(date, locale) ?? '${date.day}',
-          style: style.rangeStartTextStyle,
-        ),
-      );
-
-  CellBuilder get builderRangeStart => _builderRangeStart ?? _bRangeStart(this);
-
-  CellBuilder get builderRangeIn => _builderRangeIn ?? _bRangeWithin(this);
-
-  CellBuilder get builderRangeEnd => _builderRangeEnd ?? _bRangeEnd(this);
-
-  CellBuilder get builderSelected => _builderSelected ?? _bSelected(this);
-
-  CellBuilder get builderDisabled => _builderDisabled ?? _bDisabled(this);
-
-  CellBuilder get builderHoliday => _builderHoliday ?? _bHoliday(this);
-
-  CellBuilder get builderToday => _builderToday ?? _bToday(this);
-
-  CellBuilder get builderOutside => _builderOutside ?? _bOutside(this);
-
-  CellBuilder get builderWeekend => _builderWeekend ?? _bWeekend(this);
-
-  CellBuilder get builderWeekday => _builderWeekday ?? _bWeekday(this);
-
-  CellBuilder get builderDayOfWeek => _builderDayOfWeek ?? _bDayOfWeek(this);
-
-  RangeHighlightBuilder get builderRangeHighlight =>
-      _builderRangeHighlight ?? _bRangeHighlight(this);
+  RangeHighlightBuilder get builderHighlightRange =>
+      _bRangeHighlight ?? _builderHighlightRange(this);
 
   Generator<Widget> get builderWeekNumber =>
-      _builderWeekNumber ?? _bWeekNumber(this);
+      _bWeekNumber ?? _builderWeekNumber(this);
 
-  // DayBuilder get _buildHeaderTitle => __buildHeaderTitle ?? _bHeaderTitle(this);
+  // DayBuilder get _bildHeaderTitle => __bildHeaderTitle ?? _builderHeaderTitle(this);
 
   ///
   ///
@@ -572,6 +573,7 @@ class CalendarStyle {
   double get pageHeight {
     final daysOfWeekStyle = this.daysOfWeekStyle;
     return (daysOfWeekStyle == null ? 0.0 : daysOfWeekStyle.height) +
+        // format.weeksPerPage * rowHeight +
         weeksPerPage * rowHeight +
         (tablePadding.vertical);
   }
@@ -583,6 +585,7 @@ class CalendarStyle {
         date.day + index * DateTime.daysPerWeek * weeksPerPage,
       );
 
+  // PagingDateTime get _paging => paging ?? _pagingOf(format.weeksPerPage);
   PagingDateTime get _paging => paging ?? _pagingOf(weeksPerPage);
 }
 
