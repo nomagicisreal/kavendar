@@ -18,3 +18,4 @@ pubspec.lock
 # others
 build/
 .build/
+web/

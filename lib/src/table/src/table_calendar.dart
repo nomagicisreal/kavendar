@@ -9,7 +9,7 @@ part of '../table_calendar.dart';
 class TableCalendar<T> extends StatefulWidget {
   final dynamic locale;
   final DateTimeRange domain;
-  final DateTime focusedDay;
+  final DateTime focusedDate;
   final DateTime? currentDate;
   final bool pageJumpingEnabled;
   final bool pageAnimationEnabled;
@@ -20,7 +20,7 @@ class TableCalendar<T> extends StatefulWidget {
   ///
   ///
   ///
-  final CalendarStyle style;
+  final TableCalendarStyle style;
   final CalendarStyleDayOfWeek? styleDayOfWeek;
   final CalendarStyleWeekNumber? styleWeekNumbers;
   final CalendarStyleHeader? styleHeader;
@@ -60,7 +60,7 @@ class TableCalendar<T> extends StatefulWidget {
     ///
     ///
     ///
-    this.style = const CalendarStyle(),
+    this.style = const TableCalendarStyle(),
     this.styleDayOfWeek = const CalendarStyleDayOfWeek(),
     this.styleWeekNumbers = const CalendarStyleWeekNumber(),
     this.styleHeader = const CalendarStyleHeader(),
@@ -88,7 +88,7 @@ class TableCalendar<T> extends StatefulWidget {
        assert(style.availableWeeksPerPage.contains(style.weeksPerPage)),
        assert(
          style.availableWeeksPerPage.length <=
-             CalendarStyle.weeksPerPage_all.length,
+             TableCalendarStyle.weeksPerPage_all.length,
        ),
        assert(
          dm.DateTimeExtension.predicateAfter(focusedDay, firstDay, true),
@@ -98,7 +98,7 @@ class TableCalendar<T> extends StatefulWidget {
          dm.DateTimeExtension.predicateBefore(focusedDay, lastDay, true),
          'focusedDay($focusedDay) must be after lastDay($lastDay)',
        ),
-       focusedDay = dm.DateTimeExtension.normalizeDate(focusedDay),
+       focusedDate = dm.DateTimeExtension.normalizeDate(focusedDay),
        domain = DateTimeRange(
          start: dm.DateTimeExtension.normalizeDate(firstDay),
          end: dm.DateTimeExtension.normalizeDate(lastDay),
@@ -155,16 +155,15 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       );
 
   double get _pageHeight =>
-      widget.styleDayOfWeek?.height ??
-      0.0 +
-          widget.style.weeksPerPage * widget.style.rowHeight +
-          (widget.style.tablePadding.vertical);
+      (widget.styleDayOfWeek?.height ?? 0.0) +
+      widget.style.weeksPerPage * widget.style.rowHeight +
+      (widget.style.tablePadding.vertical);
 
   @override
   void initState() {
     super.initState();
     _endIndex = _focusedPageIndex(widget.domain.start, widget.domain.end);
-    final focusedDay = widget.focusedDay;
+    final focusedDay = widget.focusedDate;
     _focusedDate = ValueNotifier(focusedDay);
     _rangeSelectionMode = widget.rangeSelectionMode;
     _height = ValueNotifier(_pageHeight);
@@ -173,6 +172,67 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
     _pageController = PageController(initialPage: initialPage);
     widget.onCalendarCreated?.call(_pageController);
     _pageCallbackDisabled = false;
+  }
+
+  ///
+  ///
+  ///
+  void _updatePage(bool shouldAnimate) {
+    final currentIndex = _focusedPageIndex(
+      widget.domain.start,
+      _focusedDate.value,
+    );
+
+    if (currentIndex != _previousIndex ||
+        currentIndex == 0 ||
+        currentIndex == _endIndex) {
+      _pageCallbackDisabled = true;
+    }
+
+    if (shouldAnimate) {
+      if ((currentIndex - _previousIndex).abs() > 1) {
+        _pageController.jumpToPage(
+          currentIndex > _previousIndex ? currentIndex - 1 : currentIndex + 1,
+        );
+      }
+
+      _pageController.animateToPage(
+        currentIndex,
+        duration: widget.style.pageStepDuration,
+        curve: widget.style.pageStepCurve,
+      );
+    } else {
+      _pageController.jumpToPage(currentIndex);
+    }
+
+    _previousIndex = currentIndex;
+    _height.value = _pageHeight;
+    _pageCallbackDisabled = false;
+  }
+
+  @override
+  void didUpdateWidget(TableCalendar<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final shouldUpdate = _focusedDate.value != widget.focusedDate;
+    if (shouldUpdate ||
+        widget.style.weeksPerPage != oldWidget.style.weeksPerPage ||
+        widget.style.startingWeekday != oldWidget.style.startingWeekday) {
+      _focusedDate.value = widget.focusedDate;
+      _updatePage(widget.pageAnimationEnabled && shouldUpdate);
+    }
+
+    if (widget.style.rowHeight != oldWidget.style.rowHeight ||
+        widget.styleDayOfWeek?.height != oldWidget.styleDayOfWeek?.height) {
+      _height.value = _pageHeight;
+    }
+
+    if (_rangeSelectionMode != widget.rangeSelectionMode) {
+      _rangeSelectionMode = widget.rangeSelectionMode;
+    }
+
+    if (rangeStart == null && rangeEnd == null) {
+      _firstSelectedDay = null;
+    }
   }
 
   ///
@@ -433,7 +493,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       if (!DateTimeExtension.predicateSameDate(_focusedDate.value, next)) {
         _focusedDate.value = next;
       }
-      if (style.weeksPerPage == CalendarStyle.weeksPerPage_6 &&
+      if (style.weeksPerPage == TableCalendarStyle.weeksPerPage_6 &&
           !constraints.hasBoundedHeight) {
         _height.value = _pageHeight;
       }
@@ -490,6 +550,11 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       date: _focusedDate.value,
       locale: widget.locale,
     );
+    // return WSizedBox.squareColored(
+    //   dimension: 200,
+    //   color: Colors.blue.shade300,
+    //   centered: true,
+    // );
     return Padding(
       padding: widget.style.tablePadding,
       child: Row(
@@ -560,17 +625,24 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       ValueListenableBuilder<double>(
         valueListenable: _height,
         builder: _builderPage(constraints),
-        child: PageView.builder(
-          onPageChanged: _layoutPageOnChange(constraints),
-          controller: _pageController,
-          physics: widget.style.horizontalScroll,
-          itemCount: DateTimeRangeExtension.scopesOf(
-            widget.domain,
-            widget.style.startingWeekday,
-            DateTime.daysPerWeek * widget.style.weeksPerPage,
-          ),
-          itemBuilder: _builderPageItem(constraints),
+
+        // TODO: page not visible
+        child: WSizedBox.squareColored(
+          dimension: 200,
+          color: Colors.blue.shade300,
+          centered: true,
         ),
+        // child: PageView.builder(
+        //   onPageChanged: _layoutPageOnChange(constraints),
+        //   controller: _pageController,
+        //   physics: widget.style.horizontalScroll,
+        //   itemCount: DateTimeRangeExtension.scopesOf(
+        //     widget.domain,
+        //     widget.style.startingWeekday,
+        //     DateTime.daysPerWeek * widget.style.weeksPerPage,
+        //   ),
+        //   itemBuilder: _builderPageItem(constraints),
+        // ),
       );
 
   @override
@@ -583,73 +655,13 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
           _layout,
           (context, constraints) => _TableCalendarVerticalDrag(
             weeksPerPage: widget.style.weeksPerPage,
-            onFormatChange: widget.style.onFormatChange!,
+            availableWeeksPerPage: widget.style.availableWeeksPerPage,
+            onNextFormatIndex: widget.style.onFormatChange!,
             child: _layout(context, constraints),
           ),
         ),
       ],
     );
-  }
-
-  ///
-  ///
-  ///
-  void _updatePage(bool shouldAnimate) {
-    final currentIndex = _focusedPageIndex(
-      widget.domain.start,
-      _focusedDate.value,
-    );
-
-    if (currentIndex != _previousIndex ||
-        currentIndex == 0 ||
-        currentIndex == _endIndex) {
-      _pageCallbackDisabled = true;
-    }
-
-    if (shouldAnimate) {
-      if ((currentIndex - _previousIndex).abs() > 1) {
-        _pageController.jumpToPage(
-          currentIndex > _previousIndex ? currentIndex - 1 : currentIndex + 1,
-        );
-      }
-
-      _pageController.animateToPage(
-        currentIndex,
-        duration: widget.style.pageStepDuration,
-        curve: widget.style.pageStepCurve,
-      );
-    } else {
-      _pageController.jumpToPage(currentIndex);
-    }
-
-    _previousIndex = currentIndex;
-    _height.value = _pageHeight;
-    _pageCallbackDisabled = false;
-  }
-
-  @override
-  void didUpdateWidget(TableCalendar<T> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final shouldUpdate = _focusedDate.value != widget.focusedDay;
-    if (shouldUpdate ||
-        widget.style.weeksPerPage != oldWidget.style.weeksPerPage ||
-        widget.style.startingWeekday != oldWidget.style.startingWeekday) {
-      _focusedDate.value = widget.focusedDay;
-      _updatePage(widget.pageAnimationEnabled && shouldUpdate);
-    }
-
-    if (widget.style.rowHeight != oldWidget.style.rowHeight ||
-        widget.styleDayOfWeek?.height != oldWidget.styleDayOfWeek?.height) {
-      _height.value = _pageHeight;
-    }
-
-    if (_rangeSelectionMode != widget.rangeSelectionMode) {
-      _rangeSelectionMode = widget.rangeSelectionMode;
-    }
-
-    if (rangeStart == null && rangeEnd == null) {
-      _firstSelectedDay = null;
-    }
   }
 }
 
@@ -659,12 +671,14 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
 class _TableCalendarVerticalDrag extends StatefulWidget {
   const _TableCalendarVerticalDrag({
     required this.weeksPerPage,
-    required this.onFormatChange,
+    required this.availableWeeksPerPage,
+    required this.onNextFormatIndex,
     required this.child,
   });
 
   final int weeksPerPage;
-  final ValueChanged<int> onFormatChange;
+  final List<int> availableWeeksPerPage;
+  final ValueChanged<int> onNextFormatIndex;
   final Widget child;
 
   @override
@@ -685,9 +699,9 @@ class _TableCalendarVerticalDragState extends State<_TableCalendarVerticalDrag>
         threshold: 25.0,
         direction: GestureDetectorDragMixin.verticalForward,
         onDrag: GestureDetectorDragMixin.onVerticalDrag<int>(
-          CalendarStyle.weeksPerPage_all,
+          widget.availableWeeksPerPage,
           widget.weeksPerPage,
-          widget.onFormatChange,
+          widget.onNextFormatIndex,
         ),
       ),
       child: widget.child,

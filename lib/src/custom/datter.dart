@@ -7,6 +7,11 @@ part of 'calendar.dart';
 /// [GestureDetectorDragMixin], ...
 ///
 
+extension DebugUtils<T> on T {
+  void printThis([Mapper<T, String>? mapper]) =>
+      print(mapper?.call(this) ?? this);
+}
+
 typedef ConstraintsBuilder =
     Widget Function(BuildContext context, BoxConstraints constraints);
 typedef StyleWidgetBuilder<T> = Widget Function(T style);
@@ -121,14 +126,13 @@ mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
   static ValueChanged<DirectionIn4> onVerticalDrag<I>(
     List<I> items,
     I currentItem,
-    ValueChanged<int> onIndexing,
+    ValueChanged<I> onIndexing,
   ) =>
-      (direction) =>
-          direction == DirectionIn4.top
-              ? onIndexing(
-                math.min(items.indexOf(currentItem) + 1, items.length - 1),
-              )
-              : onIndexing(math.max(items.indexOf(currentItem) - 1, 0));
+      (direction) => onIndexing(
+        items[direction == DirectionIn4.top
+            ? math.min(items.indexOf(currentItem) + 1, items.length - 1)
+            : math.max(items.indexOf(currentItem) - 1, 0)],
+      );
 
   ///
   ///
