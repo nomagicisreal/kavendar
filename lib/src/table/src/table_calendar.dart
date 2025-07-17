@@ -1,4 +1,3 @@
-// ignore_for_file: constant_identifier_names
 part of '../table_calendar.dart';
 
 ///
@@ -12,17 +11,13 @@ class TableCalendar<T> extends StatefulWidget {
   final DateTimeRange domain;
   final DateTime focusedDay;
   final DateTime? currentDate;
-  final List<int> availableWeeksPerPage;
   final bool pageJumpingEnabled;
   final bool pageAnimationEnabled;
-  final bool expandVertical;
+  final bool bodyExpandVertical;
   final Duration formatAnimationDuration;
   final Curve formatAnimationCurve;
-  final Duration pageAnimationDuration;
-  final Curve pageAnimationCurve;
   final HitTestBehavior dayHitTestBehavior;
   final AvailableScroll availableScroll;
-  final HeaderStyle? headerStyle;
 
   ///
   ///
@@ -55,18 +50,14 @@ class TableCalendar<T> extends StatefulWidget {
     required DateTime lastDay,
     DateTime? currentDay,
     this.locale,
-    this.availableWeeksPerPage = weeksPerPage_all,
     this.pageJumpingEnabled = false,
     this.pageAnimationEnabled = true,
-    this.expandVertical = false,
+    this.bodyExpandVertical = false,
     this.formatAnimationDuration = DurationExtension.milli200,
     this.formatAnimationCurve = Curves.linear,
-    this.pageAnimationDuration = DurationExtension.milli300,
-    this.pageAnimationCurve = Curves.easeOut,
     this.dayHitTestBehavior = HitTestBehavior.opaque,
     this.availableScroll = AvailableScroll.both,
-    this.headerStyle = const HeaderStyle(),
-    this.style = const CalendarStyle(),
+    this.style = const CalendarStyleWithHeader(),
     this.styleMark = const CalendarStyleCellMark(),
     EventsLayoutMark<T>? eventsLayoutMark,
     EventMark<T>? eventMark,
@@ -88,8 +79,11 @@ class TableCalendar<T> extends StatefulWidget {
     this.onCalendarCreated,
   }) : _eventsLayoutMark = eventsLayoutMark,
        _eventMark = eventMark,
-       assert(availableWeeksPerPage.contains(style.weeksPerPage)),
-       assert(availableWeeksPerPage.length <= weeksPerPage_all.length),
+       assert(style.availableWeeksPerPage.contains(style.weeksPerPage)),
+       assert(
+         style.availableWeeksPerPage.length <=
+             CalendarStyle.weeksPerPage_all.length,
+       ),
        assert(
          dm.DateTimeExtension.predicateAfter(focusedDay, firstDay, true),
          'focusedDay($focusedDay) must be after firstDay($firstDay)',
@@ -115,18 +109,6 @@ class TableCalendar<T> extends StatefulWidget {
 
   EventMark<T> get eventMark =>
       _eventMark ?? CalendarStyleCellMark._singleDecoration<T>;
-
-  ///
-  ///
-  ///
-  static const int weeksPerPage_6 = 6;
-  static const int weeksPerPage_2 = 2;
-  static const int weeksPerPage_1 = 1;
-  static const List<int> weeksPerPage_all = [
-    weeksPerPage_6,
-    weeksPerPage_2,
-    weeksPerPage_1,
-  ];
 }
 
 ///
@@ -435,7 +417,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
       if (!DateTimeExtension.predicateSameDate(_focusedDate.value, next)) {
         _focusedDate.value = next;
       }
-      if (style.weeksPerPage == TableCalendar.weeksPerPage_6 &&
+      if (style.weeksPerPage == CalendarStyle.weeksPerPage_6 &&
           !constraints.hasBoundedHeight) {
         _pageHeight.value = style.pageHeight;
       }
@@ -535,6 +517,9 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
     );
   };
 
+  ///
+  ///
+  ///
   Widget _layout(BoxConstraints constraints) => ValueListenableBuilder<double>(
     valueListenable: _pageHeight,
     builder: _layoutPage(constraints),
@@ -551,19 +536,6 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
     ),
   );
 
-  ///
-  ///
-  ///
-  void _onLeftChevronTap() => _pageController.previousPage(
-    duration: widget.pageAnimationDuration,
-    curve: widget.pageAnimationCurve,
-  );
-
-  void _onRightChevronTap() => _pageController.nextPage(
-    duration: widget.pageAnimationDuration,
-    curve: widget.pageAnimationCurve,
-  );
-
   Widget _layoutBuilder(BuildContext context, BoxConstraints constraints) =>
       widget.availableScroll.canScrollVertical
           ? GestureDetector(
@@ -575,31 +547,51 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
               threshold: 25.0,
               direction: GestureDetectorDragMixin.verticalForward,
               onDrag: GestureDetectorDragMixin.onVerticalDrag<int>(
-                TableCalendar.weeksPerPage_all,
+                CalendarStyle.weeksPerPage_all,
                 widget.style.weeksPerPage,
-                widget.headerStyle?.onFormatChanged,
+                widget.style.onFormatChange,
               ),
             ),
             child: _layout(constraints),
           )
           : _layout(constraints);
 
+  ///
+  ///
+  ///
+  Widget buildHeader(BuildContext context) {
+    final style = widget.style as CalendarStyleWithHeader;
+    final buildFormatButton = style._builderFormatButton;
+    return Container(
+      decoration: style.headerDecoration,
+      margin: style.headerMargin,
+      padding: style.headerPadding,
+      child: Row(
+        children: [
+          if (style.chevronVisible)
+            style.chevron(
+              DirectionIn4.left,
+              iconOnTap: _pageController.previousPage,
+            ),
+          style.builderTitle(_focusedDate.value, widget.locale),
+          if (buildFormatButton != null) buildFormatButton(context),
+          if (style.chevronVisible)
+            style.chevron(
+              DirectionIn4.right,
+              iconOnTap: _pageController.nextPage,
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TableCalendarHeader(
-          headerStyle: widget.headerStyle,
-          locale: widget.locale,
-          focusedDate: _focusedDate.value,
-          headerTitleBuilder: widget.style.builderHeaderTitle,
-          onLeftChevronTap: _onLeftChevronTap,
-          onRightChevronTap: _onRightChevronTap,
-          availableWeeksPerPage: widget.availableWeeksPerPage,
-          weeksPerPage: widget.style.weeksPerPage,
-        ),
+        if (widget.style is CalendarStyleWithHeader) buildHeader(context),
         Flexible(
-          flex: widget.expandVertical ? 1 : 0,
+          flex: widget.bodyExpandVertical ? 1 : 0,
           child: LayoutBuilder(builder: _layoutBuilder),
         ),
       ],
@@ -630,8 +622,8 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
 
       _pageController.animateToPage(
         currentIndex,
-        duration: widget.pageAnimationDuration,
-        curve: widget.pageAnimationCurve,
+        duration: widget.style.pageStepDuration,
+        curve: widget.style.pageStepCurve,
       );
     } else {
       _pageController.jumpToPage(currentIndex);
@@ -668,111 +660,5 @@ class _TableCalendarState<T> extends State<TableCalendar<T>>
     if (rangeStart == null && rangeEnd == null) {
       _firstSelectedDay = null;
     }
-  }
-}
-
-///
-///
-///
-class TableCalendarHeader extends StatelessWidget {
-  final dynamic locale;
-  final DateTime focusedDate;
-  final int weeksPerPage;
-  final HeaderStyle? headerStyle;
-  final VoidCallback onLeftChevronTap;
-  final VoidCallback onRightChevronTap;
-  final List<int> availableWeeksPerPage;
-  final DateBuilder? headerTitleBuilder;
-
-  const TableCalendarHeader({
-    super.key,
-    this.locale,
-    required this.focusedDate,
-    required this.weeksPerPage,
-    required this.headerStyle,
-    required this.onLeftChevronTap,
-    required this.onRightChevronTap,
-    required this.availableWeeksPerPage,
-    this.headerTitleBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final headerStyle = this.headerStyle;
-    if (headerStyle == null) return Container();
-    final onFormatChange = headerStyle.onFormatChanged;
-    return Container(
-      decoration: headerStyle.decoration,
-      margin: headerStyle.margin,
-      padding: headerStyle.padding,
-      child: Row(
-        children: [
-          if (headerStyle.leftChevronVisible)
-            Padding(
-              padding: headerStyle.leftChevronMargin,
-              child: InkWell(
-                onTap: onLeftChevronTap,
-                borderRadius: BorderRadius.circular(100.0),
-                child: Padding(
-                  padding: headerStyle.leftChevronPadding,
-                  child: headerStyle.leftChevronIcon,
-                ),
-              ),
-            ),
-          Expanded(
-            child:
-                headerTitleBuilder?.call(focusedDate) ??
-                GestureDetector(
-                  onTap: () => headerStyle.onTap?.call(focusedDate),
-                  onLongPress: () => headerStyle.onLongPress?.call(focusedDate),
-                  child: Text(
-                    headerStyle.titleTextFormatter?.call(focusedDate, locale) ??
-                        DateFormat.yMMMM(locale).format(focusedDate),
-                    style: headerStyle.titleTextStyle,
-                    textAlign:
-                        headerStyle.titleCentered
-                            ? TextAlign.center
-                            : TextAlign.start,
-                  ),
-                ),
-          ),
-          if (onFormatChange != null && availableWeeksPerPage.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: InkWell(
-                borderRadius: headerStyle.formatButtonDecoration.borderRadius
-                    ?.resolve(context.textDirection),
-                onTap: () => onFormatChange(_nextFormat),
-                child: Container(
-                  decoration: headerStyle.formatButtonDecoration,
-                  padding: headerStyle.formatButtonPadding,
-                  child: Text(
-                    "${headerStyle.formatButtonShowsNext ? _nextFormat : weeksPerPage} weeks",
-                    style: headerStyle.formatButtonTextStyle,
-                  ),
-                ),
-              ),
-            ),
-          if (headerStyle.rightChevronVisible)
-            Padding(
-              padding: headerStyle.rightChevronMargin,
-              child: InkWell(
-                onTap: onRightChevronTap,
-                borderRadius: BorderRadius.circular(100.0),
-                child: Padding(
-                  padding: headerStyle.rightChevronPadding,
-                  child: headerStyle.rightChevronIcon,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  int get _nextFormat {
-    int id = availableWeeksPerPage.indexOf(weeksPerPage);
-    id = (id + 1) % availableWeeksPerPage.length;
-    return availableWeeksPerPage[id];
   }
 }
