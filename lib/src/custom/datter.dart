@@ -121,13 +121,14 @@ mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
   static ValueChanged<DirectionIn4> onVerticalDrag<I>(
     List<I> items,
     I currentItem,
-    ValueChanged<int>? onIndexing,
-  ) => (direction) {
-    if (onIndexing == null) return;
-    return direction == DirectionIn4.top
-        ? onIndexing(math.min(items.indexOf(currentItem) + 1, items.length - 1))
-        : onIndexing(math.max(items.indexOf(currentItem) - 1, 0));
-  };
+    ValueChanged<int> onIndexing,
+  ) =>
+      (direction) =>
+          direction == DirectionIn4.top
+              ? onIndexing(
+                math.min(items.indexOf(currentItem) + 1, items.length - 1),
+              )
+              : onIndexing(math.max(items.indexOf(currentItem) - 1, 0));
 
   ///
   ///

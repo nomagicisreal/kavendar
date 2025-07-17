@@ -56,7 +56,7 @@ extension DateTimeExtension on DateTime {
       ).difference(DateTime.utc(date.year, date.month, date.day)).inDays +
       1;
 
-  static int weekYearIndexOf(
+  static int weekNumberInYearOf(
     DateTime date, [
     int startingDay = DateTime.sunday,
   ]) {
