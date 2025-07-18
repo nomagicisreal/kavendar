@@ -4,6 +4,7 @@ part of '../table_calendar.dart';
 ///
 /// [Calendar]
 /// [_TableCalendarVerticalDrag]
+/// [_TableCalendarRange]
 ///
 ///
 class Calendar<T> extends StatefulWidget {
@@ -119,8 +120,6 @@ class _CalendarState<T> extends State<Calendar<T>> {
   late final ValueNotifier<double> _height;
   late final ValueNotifier<DateTime> _focusedDate;
   late RangeSelectionMode _rangeSelectionMode;
-  DateTime? rangeStart;
-  DateTime? rangeEnd;
 
   ///
   ///
@@ -129,7 +128,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
   late int _previousIndex;
   late final int _endIndex;
   late ValueNotifier<int> _indexFormat;
-  DateTime? _firstSelectedDay;
+  DateTime? _selectedDay;
 
   @override
   void dispose() {
@@ -239,9 +238,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
       _rangeSelectionMode = widget.rangeSelectionMode;
     }
 
-    if (rangeStart == null && rangeEnd == null) {
-      _firstSelectedDay = null;
-    }
+    // if (rangeStart == null && rangeEnd == null) {
+    //   _selectedDay = null;
+    // }
   }
 
   ///
@@ -270,16 +269,16 @@ class _CalendarState<T> extends State<Calendar<T>> {
     _updateFocusOnTap(date);
 
     if (_rangeSelectionMode.isSelectionOn && widget.onRangeSelected != null) {
-      if (_firstSelectedDay == null) {
-        _firstSelectedDay = date;
-        widget.onRangeSelected!(_firstSelectedDay, null, _focusedDate.value);
+      if (_selectedDay == null) {
+        _selectedDay = date;
+        widget.onRangeSelected!(_selectedDay, null, _focusedDate.value);
       } else {
-        if (date.isAfter(_firstSelectedDay!)) {
-          widget.onRangeSelected!(_firstSelectedDay, date, _focusedDate.value);
-          _firstSelectedDay = null;
-        } else if (date.isBefore(_firstSelectedDay!)) {
-          widget.onRangeSelected!(date, _firstSelectedDay, _focusedDate.value);
-          _firstSelectedDay = null;
+        if (date.isAfter(_selectedDay!)) {
+          widget.onRangeSelected!(_selectedDay, date, _focusedDate.value);
+          _selectedDay = null;
+        } else if (date.isBefore(_selectedDay!)) {
+          widget.onRangeSelected!(date, _selectedDay, _focusedDate.value);
+          _selectedDay = null;
         }
       }
     } else {
@@ -309,10 +308,10 @@ class _CalendarState<T> extends State<Calendar<T>> {
                 : RangeSelectionMode.toggledOn;
 
         if (_rangeSelectionMode.isSelectionOn) {
-          _firstSelectedDay = date;
-          widget.onRangeSelected!(_firstSelectedDay, null, _focusedDate.value);
+          _selectedDay = date;
+          widget.onRangeSelected!(_selectedDay, null, _focusedDate.value);
         } else {
-          _firstSelectedDay = null;
+          _selectedDay = null;
           widget.onDaySelected?.call(date, _focusedDate.value);
         }
       }
@@ -354,7 +353,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ConstraintsBuilder? _builderMarks(DateTime date) {
     final events = widget.eventLoader?.call(date);
     if (events == null) return null;
-    final styleMark = widget.style.styleMark;
+    final styleMark = widget.style.styleCellMark;
     if (styleMark == null) return null;
     return (context, constraints) =>
         widget.eventsLayoutMark(constraints, styleMark)(
@@ -364,54 +363,27 @@ class _CalendarState<T> extends State<Calendar<T>> {
         )!;
   }
 
-  ConstraintsBuilder? _builderHighlightRange(DateTime date) {
-    final rangeStart = this.rangeStart;
-    if (rangeStart == null) return null;
-    if (date.isBefore(rangeStart)) return null;
-    if (date.isAfter(rangeStart)) {
-      final rangeEnd = this.rangeEnd;
-      if (rangeEnd == null) return null;
-      if (date.isAfter(rangeEnd)) return null;
-      if (date.isBefore(rangeEnd)) {
-        return (_, c) =>
-            widget.style.builderHighlightRange(date, RangeState.within, c);
-      }
-      return (_, c) =>
-          widget.style.builderHighlightRange(date, RangeState.onEnd, c);
-    }
-    return (_, c) =>
-        widget.style.builderHighlightRange(date, RangeState.onStart, c);
-  }
-
-  ///
-  /// TODO: enable rangeStart, rangeEnd
-  ///
-  Widget _layoutCell({
+  Widget _buildCell({
     required DateTime date,
-    required CellBuilder builder,
+    required CellBuilder buildContainer,
     required ConstraintsBuilder? builderMarks,
-    required ConstraintsBuilder? buildHighlight,
+    // required ConstraintsBuilder? buildHighlight,
   }) => LayoutBuilder(
-    builder:
-        (context, constraints) => Stack(
-          alignment: widget.style.cellStackAlignment,
-          clipBehavior: widget.style.cellStackClip,
-          children: [
-            if (buildHighlight != null) buildHighlight(context, constraints),
-            Semantics(
-              key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
-              label:
-                  '${DateFormat.EEEE(widget.locale).format(date)}, '
-                  '${DateFormat.yMMMMd(widget.locale).format(date)}',
-              excludeSemantics: true,
-              child: builder(date, _focusedDate.value, widget.locale),
-            ),
-            if (builderMarks != null) builderMarks(context, constraints),
-          ],
-        ),
+    builder: (context, constraints) {
+      final style = widget.style;
+      return Stack(
+        alignment: style.cellStackAlignment,
+        clipBehavior: style.cellStackClip,
+        children: [
+          // if (buildHighlight != null) buildHighlight(context, constraints),
+          buildContainer(date, _focusedDate.value, widget.locale, constraints),
+          if (builderMarks != null) builderMarks(context, constraints),
+        ],
+      );
+    },
   );
 
-  Widget _activeCell({required DateTime date, required Widget child}) =>
+  Widget _buildGesture({required DateTime date, required Widget child}) =>
       GestureDetector(
         behavior: widget.dayHitTestBehavior,
         onTap: () => _onDateTapped(date),
@@ -431,14 +403,14 @@ class _CalendarState<T> extends State<Calendar<T>> {
 
     // disabled
     if (_isDayDisabled(date)) {
-      return _layoutCell(
+      return _buildCell(
         date: date,
-        builder: style.builderDisabled,
+        buildContainer: style.builderDisabled,
         builderMarks:
-            (style.styleMark?.forDisabledCell ?? false)
+            (style.styleCellMark?.forDisabledCell ?? false)
                 ? _builderMarks(date)
                 : null,
-        buildHighlight: _builderHighlightRange(date),
+        // buildHighlight: style.styleCellRange?.builderFrom(style, date),
       );
     }
 
@@ -468,13 +440,13 @@ class _CalendarState<T> extends State<Calendar<T>> {
       builder = style.builderWeekday;
     }
 
-    return _activeCell(
+    return _buildGesture(
       date: date,
-      child: _layoutCell(
+      child: _buildCell(
         date: date,
-        builder: builder,
+        buildContainer: builder,
         builderMarks: _builderMarks(date),
-        buildHighlight: _builderHighlightRange(date),
+        // buildHighlight: style.styleCellRange?.builderFrom(style, date),
       ),
     );
   }
@@ -551,6 +523,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
       days: dates,
       date: _focusedDate.value,
       locale: widget.locale,
+      constraints: constraints,
     );
 
     return Padding(
@@ -729,3 +702,36 @@ class _TableCalendarVerticalDragState extends State<_TableCalendarVerticalDrag>
     );
   }
 }
+
+///
+///
+///
+// class _TableCalendarRange extends StatefulWidget {
+//   const _TableCalendarRange({
+//     super.key,
+//     required this.style,
+//     required this.styleCellRange,
+//     required this.constraints,
+//     required this.date,
+//   });
+//
+//   final CalendarStyle style;
+//   final CalendarStyleCellRange styleCellRange;
+//   final BoxConstraints constraints;
+//
+//   // final ValueNotifier<DateTime> focusedDate;
+//   // final DateTime focusedDate;
+//
+//   @override
+//   State<_TableCalendarRange> createState() => _TableCalendarRangeState();
+// }
+//
+// class _TableCalendarRangeState extends State<_TableCalendarRange> {
+//   DateTime? rangeStart;
+//   DateTime? rangeEnd;
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return const Placeholder();
+//   }
+// }

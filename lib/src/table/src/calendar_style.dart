@@ -11,6 +11,7 @@ part of '../table_calendar.dart';
 /// [CalendarStyleWeekNumber]
 /// [CalendarStyleDayOfWeek]
 /// [CalendarStyleCellMark]
+/// [CalendarStyleCellRange]
 ///
 ///
 
@@ -31,19 +32,25 @@ typedef PagingDateTime = DateTime Function(DateTime date, int index);
 typedef DateBuilder = Widget Function(DateTime date, dynamic locale);
 
 typedef CellBuilder =
-    Widget? Function(DateTime date, DateTime focusedDate, dynamic locale);
+    Widget Function(
+      DateTime date,
+      DateTime focusedDate,
+      dynamic locale,
+      BoxConstraints constraints,
+    );
 
 typedef PageStepper =
     Future<void> Function({required Duration duration, required Curve curve});
 
 typedef PageStepperBuilder = Widget Function(PageStepper stepper);
 
+//
 typedef HighlightRangeBuilder =
-    Widget Function(
-      DateTime date,
-      RangeState state,
-      BoxConstraints constraints,
-    );
+    Widget Function(RangeState state, BoxConstraints constraints);
+
+typedef BoxConstraintsDouble = double Function(BoxConstraints constraints);
+
+typedef HighlightWidthFrom<T> = BoxConstraintsDouble Function(T style);
 
 //
 typedef EventBuilder<T> = Widget? Function(DateTime dateTime, T event);
@@ -86,7 +93,7 @@ enum RangeSelectionMode {
 ///
 /// [dateTextFormatter], ...
 /// [rangeHighlightScale], ...
-/// [_buildAnimatedContainer], ...
+/// [_buildContainer], ...
 /// [_pagingOf], ...
 ///
 class CalendarStyle {
@@ -113,7 +120,8 @@ class CalendarStyle {
   ///
   final CalendarStyleDayOfWeek? styleDayOfWeek;
   final CalendarStyleWeekNumber? styleWeekNumber;
-  final CalendarStyleCellMark? styleMark;
+  final CalendarStyleCellMark? styleCellMark;
+  final CalendarStyleCellRange? styleCellRange;
 
   ///
   ///
@@ -158,22 +166,6 @@ class CalendarStyle {
   final CellBuilder? _bHoliday;
   final CellBuilder? _bDisabled;
   final CellBuilder? _bSelected;
-  final CellBuilder? _bRangeStart;
-  final CellBuilder? _bRangeIn;
-  final CellBuilder? _bRangeEnd;
-  final HighlightRangeBuilder? _bHighlightRange;
-
-  ///
-  ///
-  ///
-  final double rangeHighlightScale;
-  final Color rangeHighlightColor;
-  final TextStyle rangeStartTextStyle;
-  final Decoration rangeStartDecoration;
-  final TextStyle rangeEndTextStyle;
-  final Decoration rangeEndDecoration;
-  final TextStyle rangeWithinTextStyle;
-  final Decoration rangeWithinDecoration;
 
   const CalendarStyle({
     this.dateTextFormatter,
@@ -201,7 +193,8 @@ class CalendarStyle {
     ///
     this.styleDayOfWeek = const CalendarStyleDayOfWeek(),
     this.styleWeekNumber = const CalendarStyleWeekNumber(),
-    this.styleMark = const CalendarStyleCellMark(),
+    this.styleCellMark = const CalendarStyleCellMark(),
+    this.styleCellRange = const CalendarStyleCellRange(),
 
     ///
     ///
@@ -255,30 +248,6 @@ class CalendarStyle {
     ///
     ///
     ///
-    this.rangeHighlightScale = 1.0,
-    this.rangeHighlightColor = const Color(0xFFBBDDFF),
-    this.rangeStartTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeStartDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.rangeEndTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeEndDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.rangeWithinTextStyle = const TextStyle(),
-    this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
-
-    ///
-    ///
-    ///
     this.builderPrioritized,
     CellBuilder? builderWeekday,
     CellBuilder? builderWeekend,
@@ -287,21 +256,13 @@ class CalendarStyle {
     CellBuilder? builderHoliday,
     CellBuilder? builderDisabled,
     CellBuilder? builderSelected,
-    CellBuilder? builderRangeStart,
-    CellBuilder? builderRangeIn,
-    CellBuilder? builderRangeEnd,
-    HighlightRangeBuilder? builderRangeHighlight,
   }) : _bWeekday = builderWeekday,
        _bWeekend = builderWeekend,
        _bOutside = builderOutside,
        _bToday = builderToday,
        _bHoliday = builderHoliday,
        _bDisabled = builderDisabled,
-       _bSelected = builderSelected,
-       _bRangeStart = builderRangeStart,
-       _bRangeIn = builderRangeIn,
-       _bRangeEnd = builderRangeEnd,
-       _bHighlightRange = builderRangeHighlight;
+       _bSelected = builderSelected;
 
   ///
   ///
@@ -318,105 +279,93 @@ class CalendarStyle {
   ///
   ///
   ///
-  static Widget _buildAnimatedContainer({
+  static Widget _buildContainer({
+    required DateTime date,
     required CalendarStyle style,
+    required dynamic locale,
     required Decoration? decoration,
-    required String text,
     required TextStyle? textStyle,
-  }) => AnimatedContainer(
-    duration: style.cellAnimationDuration,
-    margin: style.cellMargin,
-    padding: style.cellPadding,
-    decoration: decoration,
-    alignment: style.cellAlignment,
-    child: Text(text, style: textStyle),
+  }) => Semantics(
+    key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
+    label:
+        '${DateFormat.EEEE(locale).format(date)}, '
+        '${DateFormat.yMMMMd(locale).format(date)}',
+    excludeSemantics: true,
+    child: AnimatedContainer(
+      duration: style.cellAnimationDuration,
+      margin: style.cellMargin,
+      padding: style.cellPadding,
+      decoration: decoration,
+      alignment: style.cellAlignment,
+      child: Text(
+        style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
+        style: textStyle,
+      ),
+    ),
   );
 
   static CellBuilder _builderWeekday(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.weekdayDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.weekdayTextStyle,
       );
 
   static CellBuilder _builderWeekend(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.weekendDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.weekendTextStyle,
       );
 
   static CellBuilder _builderOutside(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.outsideDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.outsideTextStyle,
       );
 
   static CellBuilder _builderToday(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.todayDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.todayTextStyle,
       );
 
   static CellBuilder _builderHoliday(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.holidayDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.holidayTextStyle,
       );
 
   static CellBuilder _builderDisabled(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.disabledDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.disabledTextStyle,
       );
 
   static CellBuilder _builderSelected(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
+      (date, _, locale, __) => _buildContainer(
+        date: date,
         style: style,
+        locale: locale,
         decoration: style.selectedDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
         textStyle: style.selectedTextStyle,
       );
-
-  static CellBuilder _builderRangeWithin(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
-        style: style,
-        decoration: style.rangeWithinDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
-        textStyle: style.rangeWithinTextStyle,
-      );
-
-  static CellBuilder _builderRangeEnd(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
-        style: style,
-        decoration: style.rangeEndDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
-        textStyle: style.rangeEndTextStyle,
-      );
-
-  static CellBuilder _builderRangeStart(CalendarStyle style) =>
-      (date, _, locale) => _buildAnimatedContainer(
-        style: style,
-        decoration: style.rangeStartDecoration,
-        text: style.dateTextFormatter?.call(date, locale) ?? '${date.day}',
-        textStyle: style.rangeStartTextStyle,
-      );
-
-  CellBuilder get builderRangeStart => _bRangeStart ?? _builderRangeStart(this);
-
-  CellBuilder get builderRangeIn => _bRangeIn ?? _builderRangeWithin(this);
-
-  CellBuilder get builderRangeEnd => _bRangeEnd ?? _builderRangeEnd(this);
 
   CellBuilder get builderSelected => _bSelected ?? _builderSelected(this);
 
@@ -435,27 +384,6 @@ class CalendarStyle {
   ///
   ///
   ///
-  static HighlightRangeBuilder _builderHighlightRange(CalendarStyle style) =>
-      (date, range, constraints) => Center(
-        child: Container(
-          margin: EdgeInsetsDirectional.only(
-            start: range == true ? constraints.maxWidth * 0.5 : 0.0,
-            end: range == false ? constraints.maxWidth * 0.5 : 0.0,
-          ),
-          height:
-              (BoxConstraintsExtension.shortSide(constraints) -
-                  style.cellMargin.vertical) *
-              style.rangeHighlightScale,
-          color: style.rangeHighlightColor,
-        ),
-      );
-
-  HighlightRangeBuilder get builderHighlightRange =>
-      _bHighlightRange ?? _builderHighlightRange(this);
-
-  ///
-  ///
-  ///
   static PagingDateTime _pagingOf(int weeksPerPage) =>
       (date, index) => DateTime.utc(
         date.year,
@@ -467,6 +395,8 @@ class CalendarStyle {
       paging ?? _pagingOf(availableWeeksPerPage[indexWeeksPerPage]);
 
   int weeksPerPage(int index) => availableWeeksPerPage[index];
+
+  // Widget _layoutCell(BuildContext context, BoxConstraints constraints)
 }
 
 class CalendarStyleWeekNumber {
@@ -527,7 +457,7 @@ class CalendarStyleDayOfWeek {
     CalendarStyle style,
     CalendarStyleDayOfWeek styleDayOfWeek,
   ) =>
-      (date, _, locale) => Center(
+      (date, _, locale, __) => Center(
         child: ExcludeSemantics(
           child: Text(
             styleDayOfWeek.textFormatter(date, locale),
@@ -544,16 +474,20 @@ class CalendarStyleDayOfWeek {
     required List<DateTime> days,
     required DateTime date,
     required dynamic locale,
-  }) => TableRow(
-    decoration: decoration,
-    children: List.generate(
-      DateTime.daysPerWeek,
-      (index) => SizedBox(
-        height: height,
-        child: (_b ?? _builder(style, this))(days[index], date, locale),
+    required BoxConstraints constraints,
+  }) {
+    final builder = _b ?? _builder(style, this);
+    return TableRow(
+      decoration: decoration,
+      children: List.generate(
+        DateTime.daysPerWeek,
+        (index) => SizedBox(
+          height: height,
+          child: builder(days[index], date, locale, constraints),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 ///
@@ -634,4 +568,165 @@ class CalendarStyleCellMark {
       ),
     );
   };
+}
+
+///
+///
+///
+class CalendarStyleCellRange {
+  final CellBuilder? _bRangeStart;
+  final CellBuilder? _bRangeIn;
+  final CellBuilder? _bRangeEnd;
+  final HighlightRangeBuilder? _bHighlightRange;
+  final HighlightWidthFrom<CalendarStyle> widthFrom;
+
+  ///
+  ///
+  ///
+  final double rangeHighlightScale;
+  final Color rangeHighlightColor;
+  final TextStyle rangeStartTextStyle;
+  final Decoration rangeStartDecoration;
+  final TextStyle rangeEndTextStyle;
+  final Decoration rangeEndDecoration;
+  final TextStyle rangeWithinTextStyle;
+  final Decoration rangeWithinDecoration;
+
+  const CalendarStyleCellRange({
+    ///
+    ///
+    ///
+    this.rangeHighlightScale = 1.0,
+    this.rangeHighlightColor = const Color(0xFFBBDDFF),
+    this.rangeStartTextStyle = const TextStyle(
+      color: Color(0xFFFAFAFA),
+      fontSize: 16.0,
+    ),
+    this.rangeStartDecoration = const BoxDecoration(
+      color: Color(0xFF6699FF),
+      shape: BoxShape.circle,
+    ),
+    this.rangeEndTextStyle = const TextStyle(
+      color: Color(0xFFFAFAFA),
+      fontSize: 16.0,
+    ),
+    this.rangeEndDecoration = const BoxDecoration(
+      color: Color(0xFF6699FF),
+      shape: BoxShape.circle,
+    ),
+    this.rangeWithinTextStyle = const TextStyle(),
+    this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
+
+    ///
+    ///
+    ///
+    CellBuilder? builderRangeStart,
+    CellBuilder? builderRangeIn,
+    CellBuilder? builderRangeEnd,
+    HighlightRangeBuilder? builderRangeHighlight,
+    this.widthFrom = _widthFrom,
+  }) : _bRangeStart = builderRangeStart,
+       _bRangeIn = builderRangeIn,
+       _bRangeEnd = builderRangeEnd,
+       _bHighlightRange = builderRangeHighlight;
+
+  static CellBuilder _builderRangeWithin(
+    CalendarStyle style,
+    CalendarStyleCellRange styleRange,
+  ) =>
+      (date, _, locale, __) => CalendarStyle._buildContainer(
+        date: date,
+        style: style,
+        locale: locale,
+        decoration: styleRange.rangeWithinDecoration,
+        textStyle: styleRange.rangeWithinTextStyle,
+      );
+
+  static CellBuilder _builderRangeEnd(
+    CalendarStyle style,
+    CalendarStyleCellRange styleRange,
+  ) =>
+      (date, _, locale, __) => CalendarStyle._buildContainer(
+        date: date,
+        style: style,
+        locale: locale,
+        decoration: styleRange.rangeEndDecoration,
+        textStyle: styleRange.rangeEndTextStyle,
+      );
+
+  static CellBuilder _builderRangeStart(
+    CalendarStyle style,
+    CalendarStyleCellRange styleRange,
+  ) =>
+      (date, _, locale, __) => CalendarStyle._buildContainer(
+        date: date,
+        style: style,
+        locale: locale,
+        decoration: styleRange.rangeStartDecoration,
+        textStyle: styleRange.rangeStartTextStyle,
+      );
+
+  CellBuilder builderRangeStart(CalendarStyle style) =>
+      _bRangeStart ?? _builderRangeStart(style, this);
+
+  CellBuilder builderRangeIn(CalendarStyle style) =>
+      _bRangeIn ?? _builderRangeWithin(style, this);
+
+  CellBuilder builderRangeEnd(CalendarStyle style) =>
+      _bRangeEnd ?? _builderRangeEnd(style, this);
+
+  ///
+  ///
+  ///
+  static HighlightRangeBuilder _builderHighlightRange(
+    BoxConstraintsDouble doubleFrom,
+    CalendarStyleCellRange styleRange,
+  ) =>
+      (s, constraints) => Center(
+        child: Container(
+          margin: EdgeInsetsDirectional.only(
+            start: s == RangeState.onStart ? constraints.maxWidth * 0.5 : 0.0,
+            end: s == RangeState.onEnd ? constraints.maxWidth * 0.5 : 0.0,
+          ),
+          height: doubleFrom(constraints) * styleRange.rangeHighlightScale,
+          color: styleRange.rangeHighlightColor,
+        ),
+      );
+
+  static BoxConstraintsDouble _widthFrom(CalendarStyle style) =>
+      (constraints) =>
+          BoxConstraintsExtension.shortSide(constraints) -
+          style.cellMargin.vertical;
+
+  HighlightRangeBuilder _builderFrom(BoxConstraintsDouble doubleFrom) =>
+      _bHighlightRange ?? _builderHighlightRange(doubleFrom, this);
+
+  ///
+  ///
+  /// selected date changed
+  /// 0. reset
+  /// 1. rangeStart == null -> find range start date
+  /// 2. rangeStart != null, rangeEnd == null -> find another range date, range within date(s), unselect rangeStart
+  /// 3. rangeStart != null, rangeEnd != null -> expand range, shrink range, unselect rangeEnd
+  ///
+  ///
+  // ConstraintsBuilder? builderFrom(CalendarStyle style, DateTime date) {
+  //   // TODO: combine rangeStart and rangeEnd into 1 value notifier
+  //   final rangeStart = _rangeStart;
+  //   if (rangeStart == null) return null;
+  //   if (date.isBefore(rangeStart)) return null;
+  //   if (date.isAfter(rangeStart)) {
+  //     final rangeEnd = this.rangeEnd;
+  //     if (rangeEnd == null) return null;
+  //     if (date.isAfter(rangeEnd)) return null;
+  //
+  //     final builder = _builderFrom(widthFrom(style));
+  //     if (date.isBefore(rangeEnd)) {
+  //       return (_, constraints) => builder(RangeState.within, constraints);
+  //     }
+  //     return (_, constraints) => builder(RangeState.onEnd, constraints);
+  //   }
+  //   final builder = _builderFrom(widthFrom(style));
+  //   return (_, constraints) => builder(RangeState.onStart, constraints);
+  // }
 }
