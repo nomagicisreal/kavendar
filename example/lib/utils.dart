@@ -3,6 +3,10 @@
 
 import 'dart:collection';
 
+bool isSameDay(DateTime? d1, DateTime? d2) => (d1 == null || d2 == null)
+    ? false
+    : d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+
 /// Example event class.
 class Event {
   final String title;

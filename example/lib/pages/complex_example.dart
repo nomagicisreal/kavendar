@@ -16,12 +16,10 @@ class _TableComplexExampleState extends State<TableComplexExample> {
   late final ValueNotifier<List<Event>> _selectedEvents;
   final ValueNotifier<DateTime> _focusedDay = ValueNotifier(DateTime.now());
   final Set<DateTime> _selectedDays = LinkedHashSet<DateTime>(
-    equals: (d1, d2) =>
-        d1.year == d2.year && d1.month == d2.month && d1.day == d2.day,
+    equals: isSameDay,
     hashCode: getHashCode,
   );
 
-  int _calendarFormat = 6;
   RangeSelectionMode _rangeSelectionMode = RangeSelectionMode.toggledOff;
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
@@ -103,19 +101,11 @@ class _TableComplexExampleState extends State<TableComplexExample> {
           ),
           width: 300,
           height: 300,
-          child: TableCalendar<Event>(
+          child: Calendar<Event>(
             firstDay: kFirstDay,
             lastDay: kLastDay,
             focusedDay: _focusedDay.value,
             styleHeader: null,
-            style: TableCalendarStyle(
-              weeksPerPage: _calendarFormat,
-              onFormatChange: (format) {
-                if (_calendarFormat != format) {
-                  setState(() => _calendarFormat = format);
-                }
-              },
-            ),
             predicateSelect: (day) => _selectedDays.contains(day),
             rangeSelectionMode: _rangeSelectionMode,
             eventLoader: _getEventsForDay,

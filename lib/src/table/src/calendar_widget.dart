@@ -2,11 +2,11 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [TableCalendar]
+/// [Calendar]
 /// [_TableCalendarVerticalDrag]
 ///
 ///
-class TableCalendar<T> extends StatefulWidget {
+class Calendar<T> extends StatefulWidget {
   final dynamic locale;
   final DateTimeRange domain;
   final DateTime focusedDate;
@@ -20,11 +20,8 @@ class TableCalendar<T> extends StatefulWidget {
   ///
   ///
   ///
-  final TableCalendarStyle style;
-  final CalendarStyleDayOfWeek? styleDayOfWeek;
-  final CalendarStyleWeekNumber? styleWeekNumbers;
-  final CalendarStyleHeader? styleHeader;
-  final CalendarStyleCellMark? styleMark;
+  final CalendarStyle style;
+  final StyleHeader? styleHeader;
   final EventsLayoutMark<T>? _eventsLayoutMark;
   final EventMark<T>? _eventMark;
   final List<T> Function(DateTime day)? eventLoader;
@@ -44,7 +41,7 @@ class TableCalendar<T> extends StatefulWidget {
   final void Function(DateTime date)? onDisabledDayLongPressed;
   final void Function(PageController pageController)? onCalendarCreated;
 
-  TableCalendar({
+  Calendar({
     super.key,
     required DateTime focusedDay,
     required DateTime firstDay,
@@ -60,11 +57,8 @@ class TableCalendar<T> extends StatefulWidget {
     ///
     ///
     ///
-    this.style = const TableCalendarStyle(),
-    this.styleDayOfWeek = const CalendarStyleDayOfWeek(),
-    this.styleWeekNumbers = const CalendarStyleWeekNumber(),
-    this.styleHeader = const CalendarStyleHeader(),
-    this.styleMark = const CalendarStyleCellMark(),
+    this.style = const CalendarStyle(),
+    this.styleHeader = const StyleHeader(),
     EventsLayoutMark<T>? eventsLayoutMark,
     EventMark<T>? eventMark,
 
@@ -85,10 +79,10 @@ class TableCalendar<T> extends StatefulWidget {
     this.onCalendarCreated,
   }) : _eventsLayoutMark = eventsLayoutMark,
        _eventMark = eventMark,
-       assert(style.availableWeeksPerPage.contains(style.weeksPerPage)),
+       assert(style.availableWeeksPerPage.contains(style.initialWeeksPerPage)),
        assert(
          style.availableWeeksPerPage.length <=
-             TableCalendarStyle.weeksPerPage_all.length,
+             CalendarStyle.weeksPerPage_all.length,
        ),
        assert(
          dm.DateTimeExtension.predicateAfter(focusedDay, firstDay, true),
@@ -108,7 +102,7 @@ class TableCalendar<T> extends StatefulWidget {
   static bool _datePredicateFalse(DateTime date) => false;
 
   @override
-  State<TableCalendar<T>> createState() => _TableCalendarState<T>();
+  State<Calendar<T>> createState() => _CalendarState<T>();
 
   EventsLayoutMark<T> get eventsLayoutMark =>
       _eventsLayoutMark ?? CalendarStyleCellMark._eventsAsPositionedRow<T>;
@@ -120,7 +114,7 @@ class TableCalendar<T> extends StatefulWidget {
 ///
 ///
 ///
-class _TableCalendarState<T> extends State<TableCalendar<T>> {
+class _CalendarState<T> extends State<Calendar<T>> {
   late final PageController _pageController;
   late final ValueNotifier<double> _height;
   late final ValueNotifier<DateTime> _focusedDate;
@@ -134,6 +128,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
   late bool _pageCallbackDisabled;
   late int _previousIndex;
   late final int _endIndex;
+  late ValueNotifier<int> _indexFormat;
   DateTime? _firstSelectedDay;
 
   @override
@@ -151,27 +146,38 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       DateTimeRangeExtension.scopesOf(
         DateTimeRange(start: from, end: target),
         widget.style.startingWeekday,
-        DateTime.daysPerWeek * widget.style.weeksPerPage,
+        DateTime.daysPerWeek * widget.style.initialWeeksPerPage,
       );
 
-  double get _pageHeight =>
-      (widget.styleDayOfWeek?.height ?? 0.0) +
-      widget.style.weeksPerPage * widget.style.rowHeight +
-      (widget.style.tablePadding.vertical);
+  double _getPageHeight([BoxConstraints? constraints]) {
+    final style = widget.style;
+    final height =
+        (style.styleDayOfWeek?.height ?? 0.0) +
+        style.initialWeeksPerPage * style.rowHeight +
+        (style.tablePadding.vertical);
+    if (constraints == null) return height;
+    return constraints.hasBoundedHeight ? constraints.maxHeight : height;
+  }
 
   @override
   void initState() {
     super.initState();
-    _endIndex = _focusedPageIndex(widget.domain.start, widget.domain.end);
     final focusedDay = widget.focusedDate;
     _focusedDate = ValueNotifier(focusedDay);
-    _rangeSelectionMode = widget.rangeSelectionMode;
-    _height = ValueNotifier(_pageHeight);
     final initialPage = _focusedPageIndex(widget.domain.start, focusedDay);
     _previousIndex = initialPage;
+    _endIndex = _focusedPageIndex(widget.domain.start, widget.domain.end);
+
+    final style = widget.style;
+    _indexFormat = ValueNotifier(
+      style.availableWeeksPerPage.indexOf(style.initialWeeksPerPage),
+    );
+    _rangeSelectionMode = widget.rangeSelectionMode;
+    _height = ValueNotifier(_getPageHeight());
     _pageController = PageController(initialPage: initialPage);
-    widget.onCalendarCreated?.call(_pageController);
     _pageCallbackDisabled = false;
+
+    widget.onCalendarCreated?.call(_pageController);
   }
 
   ///
@@ -196,34 +202,37 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
         );
       }
 
+      final style = widget.style;
       _pageController.animateToPage(
         currentIndex,
-        duration: widget.style.pageStepDuration,
-        curve: widget.style.pageStepCurve,
+        duration: style.pageStepDuration,
+        curve: style.pageStepCurve,
       );
     } else {
       _pageController.jumpToPage(currentIndex);
     }
 
     _previousIndex = currentIndex;
-    _height.value = _pageHeight;
+    _height.value = _getPageHeight();
     _pageCallbackDisabled = false;
   }
 
   @override
-  void didUpdateWidget(TableCalendar<T> oldWidget) {
+  void didUpdateWidget(Calendar<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     final shouldUpdate = _focusedDate.value != widget.focusedDate;
+    final style = widget.style;
+    final styleOld = oldWidget.style;
     if (shouldUpdate ||
-        widget.style.weeksPerPage != oldWidget.style.weeksPerPage ||
-        widget.style.startingWeekday != oldWidget.style.startingWeekday) {
+        style.initialWeeksPerPage != styleOld.initialWeeksPerPage ||
+        style.startingWeekday != styleOld.startingWeekday) {
       _focusedDate.value = widget.focusedDate;
       _updatePage(widget.pageAnimationEnabled && shouldUpdate);
     }
 
-    if (widget.style.rowHeight != oldWidget.style.rowHeight ||
-        widget.styleDayOfWeek?.height != oldWidget.styleDayOfWeek?.height) {
-      _height.value = _pageHeight;
+    if (style.rowHeight != styleOld.rowHeight ||
+        style.styleDayOfWeek?.height != styleOld.styleDayOfWeek?.height) {
+      _height.value = _getPageHeight();
     }
 
     if (_rangeSelectionMode != widget.rangeSelectionMode) {
@@ -239,7 +248,8 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
   ///
   ///
   bool get _shouldBlockOutsideDays =>
-      widget.style.outsideDecoration == null && widget.style.weeksPerPage == 6;
+      widget.style.outsideDecoration == null &&
+      widget.style.initialWeeksPerPage == 6;
 
   bool _isDayDisabled(DateTime day) {
     if (day.isBefore(widget.domain.start)) return true;
@@ -318,7 +328,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       return;
     }
 
-    if (widget.style.weeksPerPage == 6) {
+    if (widget.style.initialWeeksPerPage == 6) {
       if (dm.DateTimeExtension.predicateBeforeMonth(day, _focusedDate.value)) {
         _focusedDate.value = dm.DateTimeExtension.firstDateOfMonth(
           _focusedDate.value,
@@ -341,10 +351,10 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
   ///
   ///
   ///
-  ConstraintsBuilder? _marksBuilder(DateTime date) {
+  ConstraintsBuilder? _builderMarks(DateTime date) {
     final events = widget.eventLoader?.call(date);
     if (events == null) return null;
-    final styleMark = widget.styleMark;
+    final styleMark = widget.style.styleMark;
     if (styleMark == null) return null;
     return (context, constraints) =>
         widget.eventsLayoutMark(constraints, styleMark)(
@@ -354,10 +364,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
         )!;
   }
 
-  ///
-  /// see also the comment above [HighlightRangeBuilder]
-  ///
-  ConstraintsBuilder? _highlightRangeBuilder(DateTime date) {
+  ConstraintsBuilder? _builderHighlightRange(DateTime date) {
     final rangeStart = this.rangeStart;
     if (rangeStart == null) return null;
     if (date.isBefore(rangeStart)) return null;
@@ -365,47 +372,43 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       final rangeEnd = this.rangeEnd;
       if (rangeEnd == null) return null;
       if (date.isAfter(rangeEnd)) return null;
-
-      // range in
       if (date.isBefore(rangeEnd)) {
-        return (_, c) => widget.style.builderHighlightRange(date, null, c);
+        return (_, c) =>
+            widget.style.builderHighlightRange(date, RangeState.within, c);
       }
-      // range end
-      return (_, c) => widget.style.builderHighlightRange(date, false, c);
+      return (_, c) =>
+          widget.style.builderHighlightRange(date, RangeState.onEnd, c);
     }
-    // range start
-    return (_, c) => widget.style.builderHighlightRange(date, true, c);
+    return (_, c) =>
+        widget.style.builderHighlightRange(date, RangeState.onStart, c);
   }
 
   ///
-  ///
+  /// TODO: enable rangeStart, rangeEnd
   ///
   Widget _layoutCell({
     required DateTime date,
     required CellBuilder builder,
     required ConstraintsBuilder? builderMarks,
-    required ConstraintsBuilder? builderHighlightRange,
+    required ConstraintsBuilder? buildHighlight,
   }) => LayoutBuilder(
-    builder: (context, constraints) {
-      final highlightRange = builderHighlightRange?.call(context, constraints);
-      final marks = builderMarks?.call(context, constraints);
-      return Stack(
-        alignment: widget.style.cellStackAlignment,
-        clipBehavior: widget.style.cellStackClip,
-        children: [
-          if (highlightRange != null) highlightRange,
-          Semantics(
-            key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
-            label:
-                '${DateFormat.EEEE(widget.locale).format(date)}, '
-                '${DateFormat.yMMMMd(widget.locale).format(date)}',
-            excludeSemantics: true,
-            child: builder(date, _focusedDate.value, widget.locale),
-          ),
-          if (marks != null) marks,
-        ],
-      );
-    },
+    builder:
+        (context, constraints) => Stack(
+          alignment: widget.style.cellStackAlignment,
+          clipBehavior: widget.style.cellStackClip,
+          children: [
+            if (buildHighlight != null) buildHighlight(context, constraints),
+            Semantics(
+              key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
+              label:
+                  '${DateFormat.EEEE(widget.locale).format(date)}, '
+                  '${DateFormat.yMMMMd(widget.locale).format(date)}',
+              excludeSemantics: true,
+              child: builder(date, _focusedDate.value, widget.locale),
+            ),
+            if (builderMarks != null) builderMarks(context, constraints),
+          ],
+        ),
   );
 
   Widget _activeCell({required DateTime date, required Widget child}) =>
@@ -420,6 +423,7 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
   ///
   ///
   Widget _dateBuilder(DateTime date) {
+    final style = widget.style;
     final isOutside = date.month != _focusedDate.value.month;
 
     // blocked
@@ -429,39 +433,39 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
     if (_isDayDisabled(date)) {
       return _layoutCell(
         date: date,
-        builder: widget.style.builderDisabled,
+        builder: style.builderDisabled,
         builderMarks:
-            (widget.styleMark?.forDisabledCell ?? false)
-                ? _marksBuilder(date)
+            (style.styleMark?.forDisabledCell ?? false)
+                ? _builderMarks(date)
                 : null,
-        builderHighlightRange: _highlightRangeBuilder(date),
+        buildHighlight: _builderHighlightRange(date),
       );
     }
 
     late final CellBuilder builder;
-    // outside
-    if (isOutside) {
-      builder = widget.style.builderOutside;
+    // selected
+    if (widget.predicateSelect(date)) {
+      builder = style.builderSelected;
 
-      // holiday
-    } else if (widget.predicateHoliday(date)) {
-      builder = widget.style.builderHoliday;
+      // outside
+    } else if (isOutside) {
+      builder = style.builderOutside;
 
       // today
     } else if (DateTimeExtension.predicateSameDate(date, widget.currentDate)) {
-      builder = widget.style.builderToday;
+      builder = style.builderToday;
 
-      // selected
-    } else if (widget.predicateSelect(date)) {
-      builder = widget.style.builderSelected;
+      // holiday
+    } else if (widget.predicateHoliday(date)) {
+      builder = style.builderHoliday;
 
       // weekend
-    } else if (widget.style.weekendDays.contains(date.weekday)) {
-      builder = widget.style.builderWeekend;
+    } else if (style.weekendDays.contains(date.weekday)) {
+      builder = style.builderWeekend;
 
       // weekday
     } else {
-      builder = widget.style.builderWeekday;
+      builder = style.builderWeekday;
     }
 
     return _activeCell(
@@ -469,8 +473,8 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       child: _layoutCell(
         date: date,
         builder: builder,
-        builderMarks: _marksBuilder(date),
-        builderHighlightRange: _highlightRangeBuilder(date),
+        builderMarks: _builderMarks(date),
+        buildHighlight: _builderHighlightRange(date),
       ),
     );
   }
@@ -485,7 +489,10 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
           index == _previousIndex
               ? _focusedDate.value
               : dm.DateTimeExtension.clamp(
-                style._paging(_focusedDate.value, index - _previousIndex),
+                style._paging(_indexFormat.value)(
+                  _focusedDate.value,
+                  index - _previousIndex,
+                ),
                 widget.domain.start,
                 widget.domain.end,
               );
@@ -493,83 +500,74 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
       if (!DateTimeExtension.predicateSameDate(_focusedDate.value, next)) {
         _focusedDate.value = next;
       }
-      if (style.weeksPerPage == TableCalendarStyle.weeksPerPage_6 &&
-          !constraints.hasBoundedHeight) {
-        _height.value = _pageHeight;
-      }
-
+      _height.value = _getPageHeight(constraints);
       _previousIndex = index;
-      _focusedDate.value = next;
       widget.onPageChanged?.call(index, next);
     }
 
     _pageCallbackDisabled = false;
   };
 
-  ValueWidgetBuilder<double> _builderPage(BoxConstraints constraints) =>
-      (context, value, child) => AnimatedSize(
+  Widget _buildPage(BuildContext context, double value, Widget? child) =>
+      AnimatedSize(
         duration: widget.formatAnimationDuration,
         curve: widget.formatAnimationCurve,
         alignment: Alignment.topCenter,
-        child: SizedBox(
-          height: constraints.hasBoundedHeight ? constraints.maxHeight : value,
-          child: child,
-        ),
+        child: SizedBox(height: value, child: child),
       );
 
   ///
   ///
   ///
-  double? _heightPageRow(BoxConstraints constraints) =>
-      constraints.hasBoundedHeight
-          ? (constraints.maxHeight - (widget.styleDayOfWeek?.height ?? 0.0)) /
-              widget.style.weeksPerPage
-          : widget.style.rowHeight;
+  double? _heightPageRow(BoxConstraints constraints) {
+    final style = widget.style;
+    return constraints.hasBoundedHeight
+        ? (constraints.maxHeight - (style.styleDayOfWeek?.height ?? 0.0)) /
+            style.initialWeeksPerPage
+        : style.rowHeight;
+  }
 
   NullableIndexedWidgetBuilder _builderPageItem(BoxConstraints constraints) => (
     BuildContext context,
     int index,
   ) {
-    final dates = DateTimeRangeExtension.daysIn(
+    final style = widget.style;
+    final dates = DateTimeRangeExtension.datesIn(
       DateTimeRangeExtension.weeksFrom(
         dm.DateTimeExtension.clamp(
-          widget.style._paging(widget.domain.start, index),
+          style._paging(_indexFormat.value)(widget.domain.start, index),
           widget.domain.start,
           widget.domain.end,
         ),
-        widget.style.weeksPerPage,
+        count: style.initialWeeksPerPage,
       ),
     );
-    final weekNumbers = widget.styleWeekNumbers?.build(
+    final weekNumber = style.styleWeekNumber?.build(
       dates,
       _heightPageRow(constraints),
     );
-    final daysOfWeek = widget.styleDayOfWeek?.buildTableRow(
-      style: widget.style,
+    final daysOfWeek = style.styleDayOfWeek?.buildTableRow(
+      style: style,
       days: dates,
       date: _focusedDate.value,
       locale: widget.locale,
     );
-    // return WSizedBox.squareColored(
-    //   dimension: 200,
-    //   color: Colors.blue.shade300,
-    //   centered: true,
-    // );
+
     return Padding(
-      padding: widget.style.tablePadding,
+      padding: style.tablePadding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (weekNumbers != null) weekNumbers,
+          if (weekNumber != null) weekNumber,
           Expanded(
             child: Table(
-              border: widget.style.tableBorder,
+              border: style.tableBorder,
               children: [
                 if (daysOfWeek != null) daysOfWeek,
                 ...List.generate(
                   dates.length ~/ DateTime.daysPerWeek,
                   (index) => TableRow(
-                    decoration: widget.style.rowDecoration,
+                    decoration: style.rowDecoration,
                     children: List.generate(
                       DateTime.daysPerWeek,
                       (id) => SizedBox(
@@ -592,25 +590,29 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
   ///
   ///
   ///
-  Widget buildHeader(BuildContext context, CalendarStyleHeader style) {
-    final buildFormatButton = style.builderFormatButtonFrom(widget.style);
+  Widget buildHeader(BuildContext context, StyleHeader style) {
+    final buildFormatButton = style.styleFormatButton?.buildFrom(
+      widget.style,
+      _indexFormat,
+    );
+    final buildChevron = style.styleChevrons?.buildFrom;
     return Container(
       decoration: style.headerDecoration,
       margin: style.headerMargin,
       padding: style.headerPadding,
       child: Row(
         children: [
-          if (style.chevronVisible)
-            style.chevron(
+          if (buildChevron != null)
+            buildChevron(
               DirectionIn4.left,
               iconOnTap: _pageController.previousPage,
               duration: widget.style.pageStepDuration,
               curve: widget.style.pageStepCurve,
             ),
-          style.builderTitle(_focusedDate.value, widget.locale),
+          style.buildTitle(_focusedDate.value, widget.locale),
           if (buildFormatButton != null) buildFormatButton(context),
-          if (style.chevronVisible)
-            style.chevron(
+          if (buildChevron != null)
+            buildChevron(
               DirectionIn4.right,
               iconOnTap: _pageController.nextPage,
               duration: widget.style.pageStepDuration,
@@ -621,43 +623,62 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
     );
   }
 
-  Widget _layout(BuildContext context, BoxConstraints constraints) =>
-      ValueListenableBuilder<double>(
-        valueListenable: _height,
-        builder: _builderPage(constraints),
+  Widget _buildBodyVerticalDragAble(
+    BuildContext context,
+    int value,
+    Widget? child,
+  ) => _TableCalendarVerticalDrag(
+    currentIndex: value,
+    maxIndex: widget.style.availableWeeksPerPage.length - 1,
+    onNextFormatIndex: (index) {
+      if (index == _indexFormat.value) return;
+      final style = widget.style;
+      style.onFormatChanged?.call(style.availableWeeksPerPage[index]);
+      _indexFormat.value = index;
+    },
+    child: child,
+  );
 
-        // TODO: page not visible
-        child: WSizedBox.squareColored(
-          dimension: 200,
-          color: Colors.blue.shade300,
-          centered: true,
+  ///
+  ///
+  ///
+  Widget _layout(BuildContext context, BoxConstraints constraints) {
+    final style = widget.style;
+    return ValueListenableBuilder<double>(
+      valueListenable: _height,
+      builder: _buildPage,
+      child: PageView.builder(
+        onPageChanged: _layoutPageOnChange(constraints),
+        controller: _pageController,
+        physics: style.horizontalScroll,
+        itemCount: DateTimeRangeExtension.scopesOf(
+          widget.domain,
+          style.startingWeekday,
+          DateTime.daysPerWeek * style.weeksPerPage(_indexFormat.value),
         ),
-        // child: PageView.builder(
-        //   onPageChanged: _layoutPageOnChange(constraints),
-        //   controller: _pageController,
-        //   physics: widget.style.horizontalScroll,
-        //   itemCount: DateTimeRangeExtension.scopesOf(
-        //     widget.domain,
-        //     widget.style.startingWeekday,
-        //     DateTime.daysPerWeek * widget.style.weeksPerPage,
-        //   ),
-        //   itemBuilder: _builderPageItem(constraints),
-        // ),
+        itemBuilder: _builderPageItem(constraints),
+      ),
+    );
+  }
+
+  Widget _layoutDragAble(BuildContext context, BoxConstraints constraints) =>
+      ValueListenableBuilder<int>(
+        valueListenable: _indexFormat,
+        builder: _buildBodyVerticalDragAble,
+        child: _layout(context, constraints),
       );
 
   @override
   Widget build(BuildContext context) {
     final styleHeader = widget.styleHeader;
+    final style = widget.style;
     return Column(
       children: [
         if (styleHeader != null) buildHeader(context, styleHeader),
-        widget.style.build(
-          _layout,
-          (context, constraints) => _TableCalendarVerticalDrag(
-            weeksPerPage: widget.style.weeksPerPage,
-            availableWeeksPerPage: widget.style.availableWeeksPerPage,
-            onNextFormatIndex: widget.style.onFormatChange!,
-            child: _layout(context, constraints),
+        Flexible(
+          flex: style.verticalFlex,
+          child: LayoutBuilder(
+            builder: style.verticalScrollAble ? _layoutDragAble : _layout,
           ),
         ),
       ],
@@ -670,16 +691,16 @@ class _TableCalendarState<T> extends State<TableCalendar<T>> {
 ///
 class _TableCalendarVerticalDrag extends StatefulWidget {
   const _TableCalendarVerticalDrag({
-    required this.weeksPerPage,
-    required this.availableWeeksPerPage,
+    required this.currentIndex,
+    required this.maxIndex,
     required this.onNextFormatIndex,
     required this.child,
   });
 
-  final int weeksPerPage;
-  final List<int> availableWeeksPerPage;
   final ValueChanged<int> onNextFormatIndex;
-  final Widget child;
+  final int currentIndex;
+  final int maxIndex;
+  final Widget? child;
 
   @override
   State<_TableCalendarVerticalDrag> createState() =>
@@ -698,10 +719,10 @@ class _TableCalendarVerticalDragState extends State<_TableCalendarVerticalDrag>
         difference: GestureDetectorDragMixin.verticalDifference,
         threshold: 25.0,
         direction: GestureDetectorDragMixin.verticalForward,
-        onDrag: GestureDetectorDragMixin.onVerticalDrag<int>(
-          widget.availableWeeksPerPage,
-          widget.weeksPerPage,
-          widget.onNextFormatIndex,
+        onDrag: GestureDetectorDragMixin.indexingByVerticalDrag(
+          onIndex: widget.onNextFormatIndex,
+          currentIndex: widget.currentIndex,
+          maxIndex: widget.maxIndex,
         ),
       ),
       child: widget.child,

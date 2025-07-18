@@ -9,7 +9,7 @@ part of 'calendar.dart';
 
 extension DebugUtils<T> on T {
   void printThis([Mapper<T, String>? mapper]) =>
-      print(mapper?.call(this) ?? this);
+      print(mapper?.call(this) ?? ':::::$this');
 }
 
 typedef ConstraintsBuilder =
@@ -42,7 +42,7 @@ extension BuildContextExtension on BuildContext {
 }
 
 extension DateTimeRangeExtension on DateTimeRange {
-  static List<DateTime> daysIn(DateTimeRange range) => List.generate(
+  static List<DateTime> datesIn(DateTimeRange range) => List.generate(
     range.duration.inDays + 1,
     (index) => DateTime.utc(
       range.start.year,
@@ -55,10 +55,10 @@ extension DateTimeRangeExtension on DateTimeRange {
   ///
   ///
   static DateTimeRange weeksFrom(
-    DateTime focusedDate, [
+    DateTime focusedDate, {
     int startingDay = DateTime.sunday,
     int count = 1,
-  ]) {
+  }) {
     final start = dm.DateTimeExtension.firstDateOfWeek(
       focusedDate,
       startingDay,
@@ -85,12 +85,14 @@ extension DateTimeRangeExtension on DateTimeRange {
     int startingWeekday = DateTime.sunday,
     int daysPerScope = DateTime.daysPerWeek,
   ]) =>
-      dm.DateTimeExtension.firstDateOfWeek(range.start, startingWeekday)
-          .difference(
-            dm.DateTimeExtension.lastDateOfWeek(range.end, startingWeekday),
-          )
-          .inDays +
-      1 ~/ daysPerScope;
+      (dm.DateTimeExtension.firstDateOfWeek(range.start, startingWeekday)
+              .difference(
+                dm.DateTimeExtension.lastDateOfWeek(range.end, startingWeekday),
+              )
+              .inDays
+              .abs() +
+          1) ~/
+      daysPerScope;
 }
 
 extension BoxConstraintsExtension on BoxConstraints {
@@ -123,15 +125,15 @@ mixin GestureDetectorDragMixin<T extends StatefulWidget> on State<T> {
   static DirectionIn4 horizontalForward(double d) =>
       d > 0 ? DirectionIn4.right : DirectionIn4.left;
 
-  static ValueChanged<DirectionIn4> onVerticalDrag<I>(
-    List<I> items,
-    I currentItem,
-    ValueChanged<I> onIndexing,
-  ) =>
-      (direction) => onIndexing(
-        items[direction == DirectionIn4.top
-            ? math.min(items.indexOf(currentItem) + 1, items.length - 1)
-            : math.max(items.indexOf(currentItem) - 1, 0)],
+  static ValueChanged<DirectionIn4> indexingByVerticalDrag({
+    required ValueChanged<int> onIndex,
+    required int currentIndex,
+    required int maxIndex,
+  }) =>
+      (direction) => onIndex(
+        direction == DirectionIn4.top
+            ? math.min(currentIndex + 1, maxIndex)
+            : math.max(currentIndex - 1, 0),
       );
 
   ///

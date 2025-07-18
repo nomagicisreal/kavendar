@@ -1,6 +1,8 @@
 // ignore_for_file: constant_identifier_names
 part of '../table_calendar.dart';
 
+/// TODO: clean [Calendar], [CalendarStyle], define [CalendarFormat] integrating calendar scopes, weeksPerPage, other 'how to page' functions
+
 ///
 ///
 /// days x ≤ 7:
@@ -114,3 +116,6 @@ part of '../table_calendar.dart';
 //       this.blockOutsideMonthDate,
 //       );
 // }
+
+
+// TODO: schedule enable viewing times period in a date, calendar extends schedule

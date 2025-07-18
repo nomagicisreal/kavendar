@@ -61,7 +61,7 @@ extension DateTimeExtension on DateTime {
     int startingDay = DateTime.sunday,
   ]) {
     final startingDate = DateTime.utc(date.year);
-    final days = startingDate.difference(normalizeDate(date)).inDays;
+    final days = normalizeDate(date).difference(startingDate).inDays;
     final remains = days % DateTime.daysPerWeek;
     final weeks = days ~/ 7;
     if (remains == 0) return weeks;
