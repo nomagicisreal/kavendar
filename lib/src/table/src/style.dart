@@ -2,68 +2,9 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [StyleHeader]
 /// [StyleTextButton]
 ///
 ///
-
-///
-///
-///
-class StyleHeader {
-  final void Function(DateTime focusedDay)? headerOnTap;
-  final void Function(DateTime focusedDay)? headerOnLongPress;
-  final EdgeInsets headerPadding;
-  final EdgeInsets headerMargin;
-  final BoxDecoration headerDecoration;
-
-  ///
-  ///
-  ///
-  final bool titleCentered;
-  final dm.TextFormatter? titleTextFormatter;
-  final TextStyle titleTextStyle;
-  final DateBuilder? _bTitle;
-
-  ///
-  ///
-  ///
-  final StyleTextButton? styleFormatButton;
-  final StyleChevrons? styleChevrons;
-
-  const StyleHeader({
-    this.headerOnTap,
-    this.headerOnLongPress,
-    this.headerDecoration = const BoxDecoration(),
-    this.headerMargin = EdgeInsets.zero,
-    this.headerPadding = const EdgeInsets.symmetric(vertical: 8.0),
-    this.titleCentered = false,
-    this.titleTextFormatter,
-    this.titleTextStyle = const TextStyle(fontSize: 17.0),
-    this.styleFormatButton = const StyleTextButton(),
-    this.styleChevrons = const StyleChevrons(),
-
-    DateBuilder? builderTitle,
-    WidgetBuilder Function(CalendarStyle style, StyleHeader styleHeader)?
-    builderFormatButton,
-  }) : _bTitle = builderTitle;
-
-  static DateBuilder _builderTitle(StyleHeader style) =>
-      (focusedDate, locale) => Expanded(
-        child: GestureDetector(
-          onTap: () => style.headerOnTap?.call(focusedDate),
-          onLongPress: () => style.headerOnLongPress?.call(focusedDate),
-          child: Text(
-            style.titleTextFormatter?.call(focusedDate, locale) ??
-                DateFormat.yMMMM(locale).format(focusedDate),
-            style: style.titleTextStyle,
-            textAlign: style.titleCentered ? TextAlign.center : TextAlign.start,
-          ),
-        ),
-      );
-
-  DateBuilder get buildTitle => _bTitle ?? _builderTitle(this);
-}
 
 ///
 ///
@@ -97,52 +38,55 @@ class StyleTextButton {
   ///
   ///
   ///
-  static WidgetBuilder _builderFromList<T>({
-    void Function(T currentFormat)? onChanged,
-    required StyleTextButton style,
+  static WidgetBuilder? _builderFromList({
+    required CalendarStyle style,
+    required StyleTextButton styleTextButton,
     required ValueNotifier<int> indexNotifier,
-    required List<T> availables,
-  }) =>
-      (context) => Padding(
-        padding: KGeometry.edgeInsets_left_1 * 8,
-        child: ValueListenableBuilder(
-          valueListenable: indexNotifier,
-          builder: (context, value, child) {
-            return InkWell(
-              borderRadius: style.decoration.borderRadius?.resolve(
-                context.textDirection,
+    required ValueChanged<int> notifyChanging,
+  }) {
+    final availables = style.availableWeeksPerPage;
+    return (context) => Padding(
+      padding: KGeometry.edgeInsets_left_1 * 8,
+      child: ValueListenableBuilder(
+        valueListenable: indexNotifier,
+        builder: (context, value, child) {
+          return InkWell(
+            borderRadius: styleTextButton.decoration.borderRadius?.resolve(
+              context.textDirection,
+            ),
+            onTap: () {
+              final index = (value + 1) % availables.length;
+              notifyChanging(index);
+              // indexNotifier.value = index;
+              // final weeksPerPage = availables[index];
+              // pageHeightNotifier.value =
+            },
+            child: Container(
+              decoration: styleTextButton.decoration,
+              padding: styleTextButton.padding,
+              child: Text(
+                styleTextButton._texting?.call(indexNotifier.value) ??
+                    _textWeek(availables)(indexNotifier.value),
+                style: styleTextButton.textStyle,
               ),
-              onTap: () {
-                final next = (value + 1) % availables.length;
-                indexNotifier.value = next;
-                onChanged?.call(availables[next]);
-              },
-              child: Container(
-                decoration: style.decoration,
-                padding: style.padding,
-                child: Text(
-                  style._texting?.call(indexNotifier.value) ??
-                      _textWeek(availables)(indexNotifier.value),
-                  style: style.textStyle,
-                ),
-              ),
-            );
-          },
-        ),
-      );
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   WidgetBuilder? buildFrom(
     CalendarStyle style,
     ValueNotifier<int> indexNotifier,
+    ValueChanged<int> notifyChanging,
   ) {
     if (style.availableWeeksPerPage.length == 1) return null;
-    final availables = style.availableWeeksPerPage;
-    final onFormatChanged = style.onFormatChanged;
-    return _builderFromList<int>(
-      style: this,
+    return _builderFromList(
+      style: style,
+      styleTextButton: this,
       indexNotifier: indexNotifier,
-      availables: availables,
-      onChanged: onFormatChanged,
+      notifyChanging: notifyChanging,
     );
   }
 }

@@ -1,181 +1,116 @@
-import 'package:damath/damath.dart' as da;
+extension DTExt on DateTime {
+  ///
+  /// [isSameDate], [isDifferentDate]
+  /// [isSameTime], [isDifferentTime]
+  ///
+  bool isSameDate(DateTime another) =>
+      year == another.year && month == another.month && day == another.day;
 
-///
-/// DirectionIn4 -> ltrb,
-/// predicate same date -> not null
-///
-/// [TextFormatter], ...
-/// [IterableExt], ...
-/// [DateTimeExtension], ...
-///
-///
-///
+  bool isDifferentDate(DateTime another) =>
+      year != another.year || month != another.month || day != another.day;
 
-typedef TextFormatter = String Function(DateTime date, dynamic locale);
+  bool isSameTime(DateTime another) =>
+      hour == another.hour &&
+      minute == another.minute &&
+      second == another.second;
 
-// ltrb (left, top, right, bottom) or (start, top, right, bottom)
-typedef PositionedOffset = (double?, double?, double?, double?);
-
-///
-///
-///
-extension IterableExt on Iterable {
-  static Iterable<S> mapNotNull<I, S>(
-    Iterable<I> iterable,
-    da.Mapper<I, S?> mapper,
-  ) sync* {
-    for (final item in iterable) {
-      final value = mapper(item);
-      if (value == null) continue;
-      yield value;
-    }
-  }
-
-  static List<S> mapToListNotNull<I, S>(
-    Iterable<I> iterable,
-    da.Mapper<I, S?> mapper,
-  ) {
-    final list = <S>[];
-    for (final item in iterable) {
-      list.addIfNotNull(mapper(item));
-    }
-    return list;
-  }
-}
-
-///
-///
-///
-extension DateTimeExtension on DateTime {
-  static DateTime normalizeDate(DateTime datetime) =>
-      DateTime.utc(datetime.year, datetime.month, datetime.day);
-
-  static int dayOfYear(DateTime date) =>
-      DateTime.utc(
-        date.year,
-      ).difference(DateTime.utc(date.year, date.month, date.day)).inDays +
-      1;
-
-  static int weekNumberInYearOf(
-    DateTime date, [
-    int startingDay = DateTime.sunday,
-  ]) {
-    final startingDate = DateTime.utc(date.year);
-    final days = normalizeDate(date).difference(startingDate).inDays;
-    final remains = days % DateTime.daysPerWeek;
-    final weeks = days ~/ 7;
-    if (remains == 0) return weeks;
-
-    final previousDays = (startingDate.weekday - startingDay) % 7;
-    if (remains + previousDays > DateTime.daysPerWeek) return weeks + 1;
-    return weeks;
-  }
+  bool isDifferentTime(DateTime another) =>
+      hour != another.hour ||
+      minute != another.minute ||
+      second != another.second;
 
   ///
   ///
   ///
-  static bool anyInvalidWeekday(Set<int> days) =>
-      days.any((day) => day < DateTime.monday || day > DateTime.sunday);
-
-  ///
-  ///
-  ///
-  static DateTime clamp(
-    DateTime value,
-    DateTime lowerLimit,
-    DateTime upperLimit,
-  ) {
-    if (value.isBefore(lowerLimit)) return lowerLimit;
-    if (value.isAfter(upperLimit)) return upperLimit;
-    return value;
-  }
-
-  static bool predicateBefore(
-    DateTime date,
-    DateTime lastDate, [
-    bool inclusive = true,
-  ]) =>
-      date.isBefore(lastDate) ||
-      (inclusive && da.DateTimeExtension.predicateSameDate(date, lastDate));
-
-  static bool predicateAfter(
-    DateTime date,
-    DateTime firstDate, [
-    bool inclusive = true,
-  ]) =>
-      date.isAfter(firstDate) ||
-      (inclusive && da.DateTimeExtension.predicateSameDate(date, firstDate));
-
-  ///
-  ///
-  ///
-  static bool predicateBeforeMonth(DateTime day1, DateTime day2) =>
-      day1.year == day2.year ? day1.month < day2.month : day1.isBefore(day2);
-
-  static bool predicateAfterMonth(DateTime day1, DateTime day2) =>
-      day1.year == day2.year ? day1.month > day2.month : day1.isBefore(day2);
-
-  static bool predicateIn(DateTime day, DateTime start, DateTime end) {
-    if (day.isAfter(start) && day.isBefore(end)) return true;
-    return false;
-  }
-
-  static bool predicateWithin(DateTime day, DateTime start, DateTime end) {
-    if (da.DateTimeExtension.predicateSameDate(day, start) ||
-        da.DateTimeExtension.predicateSameDate(day, end)) {
-      return true;
-    }
-    if (day.isAfter(start) && day.isBefore(end)) return true;
-    return false;
-  }
-
-  ///
-  ///
-  ///
-  static DateTime firstDateOfMonth(DateTime date) =>
-      DateTime.utc(date.year, date.month);
-
-  static DateTime lastDateOfMonth(DateTime date) => DateTime.utc(
-    date.year,
-    date.month + 1,
-  ).subtract(da.DurationExtension.day1);
-
-  // in dart, -1 % 7 = 6
-  static DateTime firstDateOfWeek(
-    DateTime date, [
-    int startingDay = DateTime.sunday,
-  ]) => date.subtract(
-    da.DurationExtension.day1 * ((date.weekday - startingDay) % 7),
-  );
-
-  static DateTime lastDateOfWeek(
-    DateTime date, [
-    int startingDay = DateTime.sunday,
-  ]) => date.add(
-    da.DurationExtension.day1 * ((startingDay - 1 - date.weekday) % 7),
+  DateTime plus({
+    int year = 0,
+    int month = 0,
+    int day = 0,
+    int hour = 0,
+    int minute = 0,
+    int second = 0,
+    int millisecond = 0,
+    int microsecond = 0,
+  }) => DateTime(
+    this.year + year,
+    this.month + month,
+    this.day + day,
+    this.hour + hour,
+    this.minute + minute,
+    this.second + second,
+    this.millisecond + millisecond,
+    this.microsecond + microsecond,
   );
 
   ///
+  /// [addYears], [dateAddYears]
+  ///
+  DateTime addYears(
+    int n, {
+    bool keepMonth = true,
+    bool keepDay = true,
+    bool keepHour = false,
+    bool keepMinute = false,
+    bool keepSecond = false,
+    bool keepMillisecond = false,
+    bool keepMicrosecond = false,
+  }) => DateTime(
+    year + n,
+    keepMonth ? month : 0,
+    keepDay ? day : 0,
+    keepHour ? hour : 0,
+    keepMinute ? minute : 0,
+    keepSecond ? second : 0,
+    keepMillisecond ? millisecond : 0,
+    keepMicrosecond ? microsecond : 0,
+  );
+
+  DateTime dateAddYears(int n) => DateTime(year + n, month, day);
+
+  ///
+  /// [addMonths], [dateAddMonths]
+  ///
+  DateTime addMonths(
+    int n, {
+    bool keepDay = true,
+    bool keepHour = false,
+    bool keepMinute = false,
+    bool keepSecond = false,
+    bool keepMillisecond = false,
+    bool keepMicrosecond = false,
+  }) => DateTime(
+    year,
+    month + n,
+    keepDay ? day : 0,
+    keepHour ? hour : 0,
+    keepMinute ? minute : 0,
+    keepSecond ? second : 0,
+    keepMillisecond ? millisecond : 0,
+    keepMicrosecond ? microsecond : 0,
+  );
+
+  DateTime dateAddMonths(int n) => DateTime(year, month + n, day);
+
   ///
   ///
-  static DateTime firstDateOfWeekInMonth(
-    DateTime date, [
-    int startingDay = DateTime.sunday,
-  ]) => firstDateOfMonth(
-    date,
-  ).subtract(da.DurationExtension.day1 * ((date.weekday - startingDay) % 7));
+  ///
+  DateTime addDays(
+    int n, {
+    bool keepHour = false,
+    bool keepMinute = false,
+    bool keepSecond = false,
+    bool keepMillisecond = false,
+    bool keepMicrosecond = false,
+  }) => DateTime(
+    year,
+    month,
+    day + n,
+    keepHour ? hour : 0,
+    keepMinute ? minute : 0,
+    keepSecond ? second : 0,
+    keepMillisecond ? millisecond : 0,
+    keepMicrosecond ? microsecond : 0,
+  );
 
-  static DateTime lastDateOfWeekInMonth(
-    DateTime date, [
-    int startingDay = DateTime.sunday,
-  ]) => lastDateOfMonth(
-    date,
-  ).add(da.DurationExtension.day1 * ((startingDay - 1 - date.weekday) % 7));
-
-  // static int monthRowsOf(DateTime date, [int startingDay = DateTime.sunday]) =>
-  //     (1 +
-  //         firstDateOfWeekInMonth(
-  //           date,
-  //         ).difference(lastDateOfWeekInMonth(date, startingDay)).inDays) ~/
-  //     7;
+  DateTime dateAddDays(int n) => DateTime(year, month, day + n);
 }

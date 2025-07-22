@@ -61,18 +61,14 @@ class _TableMultiExampleState extends State<TableMultiExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       appBar: AppBar(title: const Text('TableCalendar - Multi')),
       body: Column(
         children: [
           Calendar<Event>(
-            firstDay: kFirstDay,
-            lastDay: kLastDay,
-            focusedDay: _focusedDay,
+            focusedDate: _focusedDay,
             eventLoader: _getEventsForDay,
             style: CalendarStyle(startingWeekday: DateTime.monday),
-            predicateSelect: (day) {
-              return _selectedDays.contains(day);
-            },
             onDaySelected: _onDaySelected,
             onPageChanged: (index, focusedDay) {
               _focusedDay = focusedDay;

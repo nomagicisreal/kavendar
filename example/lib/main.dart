@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TableCalendar Example',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(primarySwatch: Colors.brown),
       home: const StartPage(),
     );
   }
@@ -35,6 +35,7 @@ class _StartPageState extends State<StartPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurface,
       appBar: AppBar(title: const Text('TableCalendar Example')),
       body: Center(
         child: Column(

@@ -5,10 +5,11 @@ import 'package:damath/damath.dart';
 import 'package:datter/datter.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:kavendar/kavendar.dart';
-import 'package:kavendar/src/custom/damath.dart' as dm;
+import 'package:kavendar/src/custom/damath.dart';
+import 'package:kavendar/src/custom/datter.dart';
 
 part 'src/calendar_widget.dart';
 part 'src/calendar_style.dart';
+part 'src/calendar_style_extension.dart';
 part 'src/style.dart';
 part 'src/calendar_format.dart';

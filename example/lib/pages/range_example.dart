@@ -12,8 +12,8 @@ class TableRangeExample extends StatefulWidget {
 }
 
 class _TableRangeExampleState extends State<TableRangeExample> {
-  RangeSelectionMode _rangeSelectionMode = RangeSelectionMode
-      .toggledOn; // Can be toggled on/off by longpressing a date
+  // RangeSelectionMode _rangeSelectionMode = RangeSelectionMode
+  //     .toggledOn; // Can be toggled on/off by longpressing a date
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   DateTime? _rangeStart;
@@ -22,13 +22,11 @@ class _TableRangeExampleState extends State<TableRangeExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       appBar: AppBar(title: const Text('TableCalendar - Range')),
       body: Calendar(
-        firstDay: kFirstDay,
-        lastDay: kLastDay,
-        focusedDay: _focusedDay,
-        predicateSelect: (day) => isSameDay(_selectedDay, day),
-        rangeSelectionMode: _rangeSelectionMode,
+        focusedDate: _focusedDay,
+        // rangeSelectionMode: _rangeSelectionMode,
         onDaySelected: (selectedDay, focusedDay) {
           if (!isSameDay(_selectedDay, selectedDay)) {
             setState(() {
@@ -36,7 +34,7 @@ class _TableRangeExampleState extends State<TableRangeExample> {
               _focusedDay = focusedDay;
               _rangeStart = null; // Important to clean those
               _rangeEnd = null;
-              _rangeSelectionMode = RangeSelectionMode.toggledOff;
+              // _rangeSelectionMode = RangeSelectionMode.toggledOff;
             });
             print('on date selected');
           }
@@ -47,7 +45,7 @@ class _TableRangeExampleState extends State<TableRangeExample> {
             _focusedDay = focusedDay;
             _rangeStart = start;
             _rangeEnd = end;
-            _rangeSelectionMode = RangeSelectionMode.toggledOn;
+            // _rangeSelectionMode = RangeSelectionMode.toggledOn;
           });
           print('on range selected');
         },

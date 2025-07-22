@@ -9,34 +9,34 @@ part of '../table_calendar.dart';
 ///
 class Calendar<T> extends StatefulWidget {
   final dynamic locale;
-  final DateTimeRange domain;
-  final DateTime focusedDate;
-  final DateTime? currentDate;
+  final DateTime? _focusedDate;
   final bool pageJumpingEnabled;
   final bool pageAnimationEnabled;
+  final int initialWeeksPerPage;
   final Duration formatAnimationDuration;
   final Curve formatAnimationCurve;
-  final HitTestBehavior dayHitTestBehavior;
+  final HitTestBehavior dateHitTestBehavior;
 
   ///
   ///
   ///
   final CalendarStyle style;
-  final StyleHeader? styleHeader;
-  final EventsLayoutMark<T>? _eventsLayoutMark;
-  final EventMark<T>? _eventMark;
-  final List<T> Function(DateTime day)? eventLoader;
+  final CalendarStyleHeader? styleHeader;
+  final EventsLayoutMark<T>? eventsLayoutMark;
+  final EventMark<T>? eventMark;
+  final EventLoader<T>? eventLoader;
 
   ///
   ///
   ///
-  final RangeSelectionMode rangeSelectionMode;
-  final bool Function(DateTime day)? enabledDayPredicate;
-  final Predicator<DateTime> predicateSelect;
+  // final RangeSelectionMode rangeSelectionMode;
+  final Predicator<DateTime> predicateDisable;
   final Predicator<DateTime> predicateHoliday;
+  final Predicator<DateTime> predicateWeekend;
+  final Predicator<DateTime> predicateWeekday;
   final OnRangeSelected? onRangeSelected;
   final OnDaySelected? onDaySelected;
-  final OnDaySelected? onDayLongPressed;
+  final OnDaySelected? onDateLongPressed;
   final OnPageChanged? onPageChanged;
   final void Function(DateTime date)? onDisabledDayTapped;
   final void Function(DateTime date)? onDisabledDayLongPressed;
@@ -44,137 +44,162 @@ class Calendar<T> extends StatefulWidget {
 
   Calendar({
     super.key,
-    required DateTime focusedDay,
-    required DateTime firstDay,
-    required DateTime lastDay,
-    DateTime? currentDay,
+    DateTime? focusedDate,
     this.locale,
-    this.pageJumpingEnabled = false,
+    this.initialWeeksPerPage = CalendarStyle.weeksPerPage_6,
+    this.pageJumpingEnabled = true,
     this.pageAnimationEnabled = true,
     this.formatAnimationDuration = DurationExtension.milli200,
     this.formatAnimationCurve = Curves.linear,
-    this.dayHitTestBehavior = HitTestBehavior.opaque,
+    this.dateHitTestBehavior = HitTestBehavior.opaque,
 
     ///
     ///
     ///
     this.style = const CalendarStyle(),
-    this.styleHeader = const StyleHeader(),
-    EventsLayoutMark<T>? eventsLayoutMark,
-    EventMark<T>? eventMark,
+    this.styleHeader = const CalendarStyleHeader(),
+    this.eventsLayoutMark,
+    this.eventMark,
 
     ///
     ///
     ///
-    this.rangeSelectionMode = RangeSelectionMode.toggledOff,
+    // this.rangeSelectionMode = RangeSelectionMode.toggledOff,
     this.eventLoader,
-    this.enabledDayPredicate,
-    this.predicateSelect = _datePredicateFalse,
+    this.predicateDisable = _datePredicateFalse,
     this.predicateHoliday = _datePredicateFalse,
+    this.predicateWeekend = _datePredicateWeekend,
+    this.predicateWeekday = _datePredicateWeekday,
     this.onRangeSelected,
     this.onDaySelected,
-    this.onDayLongPressed,
+    this.onDateLongPressed,
     this.onDisabledDayTapped,
     this.onDisabledDayLongPressed,
     this.onPageChanged,
     this.onCalendarCreated,
-  }) : _eventsLayoutMark = eventsLayoutMark,
-       _eventMark = eventMark,
-       assert(style.availableWeeksPerPage.contains(style.initialWeeksPerPage)),
+  }) : _focusedDate = focusedDate,
+       assert(style.availableWeeksPerPage.contains(initialWeeksPerPage)),
        assert(
          style.availableWeeksPerPage.length <=
              CalendarStyle.weeksPerPage_all.length,
        ),
-       assert(
-         dm.DateTimeExtension.predicateAfter(focusedDay, firstDay, true),
-         'focusedDay($focusedDay) must be after firstDay($firstDay)',
-       ),
-       assert(
-         dm.DateTimeExtension.predicateBefore(focusedDay, lastDay, true),
-         'focusedDay($focusedDay) must be after lastDay($lastDay)',
-       ),
-       focusedDate = dm.DateTimeExtension.normalizeDate(focusedDay),
-       domain = DateTimeRange(
-         start: dm.DateTimeExtension.normalizeDate(firstDay),
-         end: dm.DateTimeExtension.normalizeDate(lastDay),
-       ),
-       currentDate = currentDay ?? DateTime.now();
-
-  static bool _datePredicateFalse(DateTime date) => false;
+       assert(() {
+         if (focusedDate == null) return true;
+         final domain = style._domain;
+         if (domain == null) return true;
+         return focusedDate.isAfter(domain.start) &&
+             focusedDate.isBefore(domain.end);
+       }(), 'focusedDay($focusedDate) must between domain(${style.domain})'),
+       assert(() {
+         var date = DateTime.now();
+         for (var i = 0; i < 7; i++) {
+           if (predicateWeekend(date) == predicateWeekday(date)) return false;
+         }
+         return true;
+       }());
 
   @override
   State<Calendar<T>> createState() => _CalendarState<T>();
 
-  EventsLayoutMark<T> get eventsLayoutMark =>
-      _eventsLayoutMark ?? CalendarStyleCellMark._eventsAsPositionedRow<T>;
+  DateTime get focusedDate => _focusedDate ?? DateTime.now();
 
-  EventMark<T> get eventMark =>
-      _eventMark ?? CalendarStyleCellMark._singleDecoration<T>;
+  ///
+  ///
+  ///
+  static bool _datePredicateFalse(DateTime date) => false;
+
+  static bool _datePredicateWeekend(DateTime date) {
+    final day = date.weekday;
+    return day == DateTime.sunday || day == DateTime.saturday;
+  }
+
+  static bool _datePredicateWeekday(DateTime date) {
+    final day = date.weekday;
+    return day == DateTime.monday ||
+        day == DateTime.tuesday ||
+        day == DateTime.wednesday ||
+        day == DateTime.thursday ||
+        day == DateTime.friday;
+  }
 }
 
 ///
 ///
 ///
 class _CalendarState<T> extends State<Calendar<T>> {
+  late final CalendarCellContainer _configuration;
   late final PageController _pageController;
-  late final ValueNotifier<double> _height;
-  late final ValueNotifier<DateTime> _focusedDate;
-  late RangeSelectionMode _rangeSelectionMode;
+  late final ValueNotifier<double> _pageHeight;
+  late final ValueNotifier<int> _indexWeeksPerPage;
 
-  ///
-  ///
-  ///
+  // late final ValueNotifier<DateTime> _focusedDate;
+  late final int _indexEnd;
+  late int _indexPrevious;
   late bool _pageCallbackDisabled;
-  late int _previousIndex;
-  late final int _endIndex;
-  late ValueNotifier<int> _indexFormat;
-  DateTime? _selectedDay;
+  late DateTimeRange _domain;
+  late DateTime _focusedDate;
+
+  // late RangeSelectionMode _rangeSelectionMode;
+
+  // DateTime? _selectedDate;
 
   @override
   void dispose() {
-    _focusedDate.dispose();
     _pageController.dispose();
-    _height.dispose();
+    _pageHeight.dispose();
+    _indexWeeksPerPage.dispose();
+    // _focusedDate.dispose();
     super.dispose();
   }
 
   ///
   ///
   ///
-  int _focusedPageIndex(DateTime from, DateTime target) =>
-      DateTimeRangeExtension.scopesOf(
-        DateTimeRange(start: from, end: target),
-        widget.style.startingWeekday,
-        DateTime.daysPerWeek * widget.style.initialWeeksPerPage,
-      );
-
-  double _getPageHeight([BoxConstraints? constraints]) {
+  int _indexPage(DateTime from, DateTime target, int weeksPerPage) {
     final style = widget.style;
-    final height =
-        (style.styleDayOfWeek?.height ?? 0.0) +
-        style.initialWeeksPerPage * style.rowHeight +
-        (style.tablePadding.vertical);
-    if (constraints == null) return height;
-    return constraints.hasBoundedHeight ? constraints.maxHeight : height;
+    final starting = style.startingWeekday;
+    final weeks =
+        (target
+                .lastDateOfWeek(starting)
+                .difference(from.firstDateOfWeek(starting))
+                .inDays +
+            1) ~/
+        DateTime.daysPerWeek;
+
+    return (weeks / weeksPerPage).ceil();
   }
 
   @override
   void initState() {
     super.initState();
-    final focusedDay = widget.focusedDate;
-    _focusedDate = ValueNotifier(focusedDay);
-    final initialPage = _focusedPageIndex(widget.domain.start, focusedDay);
-    _previousIndex = initialPage;
-    _endIndex = _focusedPageIndex(widget.domain.start, widget.domain.end);
-
+    final focusedDate = widget.focusedDate;
     final style = widget.style;
-    _indexFormat = ValueNotifier(
-      style.availableWeeksPerPage.indexOf(style.initialWeeksPerPage),
+    final wPP = widget.initialWeeksPerPage;
+    final domain = style.domain(focusedDate);
+    _domain = domain;
+    _focusedDate = focusedDate;
+
+    final indexPageInitial = _indexPage(domain.start, focusedDate, wPP);
+    _indexPrevious = indexPageInitial;
+    _indexEnd = _indexPage(domain.start, domain.end, wPP);
+    _indexWeeksPerPage = ValueNotifier(
+      style.availableWeeksPerPage.indexOf(wPP),
     );
-    _rangeSelectionMode = widget.rangeSelectionMode;
-    _height = ValueNotifier(_getPageHeight());
-    _pageController = PageController(initialPage: initialPage);
+
+    // _rangeSelectionMode = widget.rangeSelectionMode;
+    _pageHeight = ValueNotifier(double.infinity);
+    _pageController = PageController(initialPage: indexPageInitial);
     _pageCallbackDisabled = false;
+
+    _configuration = {
+      CalendarCellType.disabled: (widget.predicateDisable, style.buildDisabled),
+      CalendarCellType.holiday: (widget.predicateHoliday, style.buildHoliday),
+      CalendarCellType.weekend: (widget.predicateWeekend, style.buildWeekend),
+      CalendarCellType.weekday: (widget.predicateWeekday, style.buildWeekday),
+      CalendarCellType.selected: (_predicateSelected, style.buildSelected),
+      CalendarCellType.outside: (_predicateOutside, style.buildOutside),
+      CalendarCellType.today: (_predicateToday, style.buildToday),
+    };
 
     widget.onCalendarCreated?.call(_pageController);
   }
@@ -183,302 +208,232 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   void _updatePage(bool shouldAnimate) {
-    final currentIndex = _focusedPageIndex(
-      widget.domain.start,
-      _focusedDate.value,
+    final style = widget.style;
+    final indexCurrent = _indexPage(
+      _domain.start,
+      _focusedDate,
+      style.availableWeeksPerPage[_indexWeeksPerPage.value],
     );
 
-    if (currentIndex != _previousIndex ||
-        currentIndex == 0 ||
-        currentIndex == _endIndex) {
+    if (indexCurrent != _indexPrevious ||
+        indexCurrent == 0 ||
+        indexCurrent == _indexEnd) {
       _pageCallbackDisabled = true;
+      return;
     }
 
-    if (shouldAnimate) {
-      if ((currentIndex - _previousIndex).abs() > 1) {
-        _pageController.jumpToPage(
-          currentIndex > _previousIndex ? currentIndex - 1 : currentIndex + 1,
-        );
-      }
+    // if (shouldAnimate) {
+    //   if ((indexCurrent - _indexPrevious).abs() > 1) {
+    //     _pageController.jumpToPage(
+    //       indexCurrent > _indexPrevious ? indexCurrent - 1 : indexCurrent + 1,
+    //     );
+    //   }
+    //
+    //   final style = widget.style;
+    //   _pageController.animateToPage(
+    //     indexCurrent,
+    //     duration: style.pageStepDuration,
+    //     curve: style.pageStepCurve,
+    //   );
+    // } else {
+    //   _pageController.jumpToPage(indexCurrent);
+    // }
 
-      final style = widget.style;
-      _pageController.animateToPage(
-        currentIndex,
-        duration: style.pageStepDuration,
-        curve: style.pageStepCurve,
-      );
-    } else {
-      _pageController.jumpToPage(currentIndex);
-    }
-
-    _previousIndex = currentIndex;
-    _height.value = _getPageHeight();
+    _indexPrevious = indexCurrent;
     _pageCallbackDisabled = false;
   }
 
   @override
   void didUpdateWidget(Calendar<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final shouldUpdate = _focusedDate.value != widget.focusedDate;
-    final style = widget.style;
-    final styleOld = oldWidget.style;
-    if (shouldUpdate ||
-        style.initialWeeksPerPage != styleOld.initialWeeksPerPage ||
-        style.startingWeekday != styleOld.startingWeekday) {
-      _focusedDate.value = widget.focusedDate;
-      _updatePage(widget.pageAnimationEnabled && shouldUpdate);
+    if (_focusedDate != widget.focusedDate || widget.style != oldWidget.style) {
+      _focusedDate = widget.focusedDate;
+      _updatePage(widget.pageAnimationEnabled);
     }
 
-    if (style.rowHeight != styleOld.rowHeight ||
-        style.styleDayOfWeek?.height != styleOld.styleDayOfWeek?.height) {
-      _height.value = _getPageHeight();
-    }
-
-    if (_rangeSelectionMode != widget.rangeSelectionMode) {
-      _rangeSelectionMode = widget.rangeSelectionMode;
-    }
+    // if (_rangeSelectionMode != widget.rangeSelectionMode) {
+    //   _rangeSelectionMode = widget.rangeSelectionMode;
+    // }
 
     // if (rangeStart == null && rangeEnd == null) {
-    //   _selectedDay = null;
+    //   _selectedDate = null;
     // }
   }
 
   ///
   ///
   ///
-  bool get _shouldBlockOutsideDays =>
-      widget.style.outsideDecoration == null &&
-      widget.style.initialWeeksPerPage == 6;
-
-  bool _isDayDisabled(DateTime day) {
-    if (day.isBefore(widget.domain.start)) return true;
-    if (day.isAfter(widget.domain.end)) return true;
-    final enable = widget.enabledDayPredicate;
-    if (enable == null) return false;
-    return !enable(day);
-  }
-
-  ///
-  ///
-  ///
   void _onDateTapped(DateTime date) {
-    final isOutside = date.month != _focusedDate.value.month;
-    if (isOutside && _shouldBlockOutsideDays) return;
-    if (_isDayDisabled(date)) return widget.onDisabledDayTapped?.call(date);
+    if (widget.predicateDisable(date)) {
+      return widget.onDisabledDayTapped?.call(date);
+    }
 
     _updateFocusOnTap(date);
 
-    if (_rangeSelectionMode.isSelectionOn && widget.onRangeSelected != null) {
-      if (_selectedDay == null) {
-        _selectedDay = date;
-        widget.onRangeSelected!(_selectedDay, null, _focusedDate.value);
-      } else {
-        if (date.isAfter(_selectedDay!)) {
-          widget.onRangeSelected!(_selectedDay, date, _focusedDate.value);
-          _selectedDay = null;
-        } else if (date.isBefore(_selectedDay!)) {
-          widget.onRangeSelected!(date, _selectedDay, _focusedDate.value);
-          _selectedDay = null;
-        }
-      }
-    } else {
-      widget.onDaySelected?.call(date, _focusedDate.value);
-    }
+    // if (_rangeSelectionMode.isSelectionOn && widget.onRangeSelected != null) {
+    // if (_selectedDate == null) {
+    //   _selectedDate = date;
+    //   widget.onRangeSelected!(_selectedDate, null, _focusedDate);
+    // } else {
+    //   if (date.isAfter(_selectedDate!)) {
+    //     widget.onRangeSelected!(_selectedDate, date, _focusedDate);
+    //     _selectedDate = null;
+    //   } else if (date.isBefore(_selectedDate!)) {
+    //     widget.onRangeSelected!(date, _selectedDate, _focusedDate);
+    //     _selectedDate = null;
+    //   }
+    // }
+    // } else {
+    //   widget.onDaySelected?.call(date, _focusedDate);
+    // }
   }
 
   void _onDateLongPressed(DateTime date) {
-    final isOutside = date.month != _focusedDate.value.month;
-    if (isOutside && _shouldBlockOutsideDays) return;
-
-    if (_isDayDisabled(date)) {
+    if (widget.predicateDisable(date)) {
       return widget.onDisabledDayLongPressed?.call(date);
     }
 
-    if (widget.onDayLongPressed != null) {
+    if (widget.onDateLongPressed != null) {
       _updateFocusOnTap(date);
-      return widget.onDayLongPressed!(date, _focusedDate.value);
+      return widget.onDateLongPressed!(date, _focusedDate);
     }
 
     if (widget.onRangeSelected != null) {
-      if (_rangeSelectionMode.isToggleAble) {
-        _updateFocusOnTap(date);
-        _rangeSelectionMode =
-            _rangeSelectionMode == RangeSelectionMode.toggledOn
-                ? RangeSelectionMode.toggledOff
-                : RangeSelectionMode.toggledOn;
-
-        if (_rangeSelectionMode.isSelectionOn) {
-          _selectedDay = date;
-          widget.onRangeSelected!(_selectedDay, null, _focusedDate.value);
-        } else {
-          _selectedDay = null;
-          widget.onDaySelected?.call(date, _focusedDate.value);
-        }
-      }
+      // if (_rangeSelectionMode.isToggleAble) {
+      //   _updateFocusOnTap(date);
+      //   _rangeSelectionMode =
+      //       _rangeSelectionMode == RangeSelectionMode.toggledOn
+      //           ? RangeSelectionMode.toggledOff
+      //           : RangeSelectionMode.toggledOn;
+      //
+      //   if (_rangeSelectionMode.isSelectionOn) {
+      //     _selectedDate = date;
+      //     widget.onRangeSelected!(_selectedDate, null, _focusedDate);
+      //   } else {
+      //     _selectedDate = null;
+      //     widget.onDaySelected?.call(date, _focusedDate);
+      //   }
+      // }
     }
   }
 
   ///
   ///
   ///
-  void _updateFocusOnTap(DateTime day) {
+  void _updateFocusOnTap(DateTime date) {
+    // print('focused: ${_focusedDate}, date: $date');
     if (widget.pageJumpingEnabled) {
-      _focusedDate.value = day;
+      _focusedDate = date;
+      setState(() {});
+      // TODO: instead of setState, using ValueListenableBuilder
       return;
     }
 
-    if (widget.style.initialWeeksPerPage == 6) {
-      if (dm.DateTimeExtension.predicateBeforeMonth(day, _focusedDate.value)) {
-        _focusedDate.value = dm.DateTimeExtension.firstDateOfMonth(
-          _focusedDate.value,
-        );
-      } else if (dm.DateTimeExtension.predicateAfterMonth(
-        day,
-        _focusedDate.value,
-      )) {
-        _focusedDate.value = dm.DateTimeExtension.lastDateOfMonth(
-          _focusedDate.value,
-        );
+    final focusedDate = _focusedDate;
+    if (widget.initialWeeksPerPage == CalendarStyle.weeksPerPage_6) {
+      if (date.month < focusedDate.month) {
+        _focusedDate = focusedDate.firstDateOfMonth;
+      } else if (date.month > focusedDate.month) {
+        _focusedDate = focusedDate.lastDateOfMonth;
       } else {
-        _focusedDate.value = day;
+        _focusedDate = date;
       }
     } else {
-      _focusedDate.value = day;
+      _focusedDate = date;
     }
   }
 
   ///
   ///
   ///
-  ConstraintsBuilder? _builderMarks(DateTime date) {
-    final events = widget.eventLoader?.call(date);
-    if (events == null) return null;
-    final styleMark = widget.style.styleCellMark;
-    if (styleMark == null) return null;
-    return (context, constraints) =>
-        widget.eventsLayoutMark(constraints, styleMark)(
-          date,
-          events,
-          widget.eventMark(constraints, styleMark),
-        )!;
-  }
-
-  Widget _buildCell({
-    required DateTime date,
-    required CellBuilder buildContainer,
-    required ConstraintsBuilder? builderMarks,
-    // required ConstraintsBuilder? buildHighlight,
-  }) => LayoutBuilder(
-    builder: (context, constraints) {
-      final style = widget.style;
-      return Stack(
-        alignment: style.cellStackAlignment,
-        clipBehavior: style.cellStackClip,
-        children: [
-          // if (buildHighlight != null) buildHighlight(context, constraints),
-          buildContainer(date, _focusedDate.value, widget.locale, constraints),
-          if (builderMarks != null) builderMarks(context, constraints),
-        ],
-      );
-    },
-  );
-
-  Widget _buildGesture({required DateTime date, required Widget child}) =>
-      GestureDetector(
-        behavior: widget.dayHitTestBehavior,
-        onTap: () => _onDateTapped(date),
-        onLongPress: () => _onDateLongPressed(date),
-        child: child,
-      );
+  // Widget _builderDate({
+  //   required DateTime date,
+  //   required CellBuilder build,
+  //   required ConstraintsBuilder? buildHighlight,
+  //   required ConstraintsBuilder? buildMarks,
+  // }) => LayoutBuilder(
+  //   builder:
+  //       buildHighlight == null
+  //           ? (buildMarks == null
+  //               ? (_, constraints) =>
+  //                   build(date, _focusedDate, widget.locale, constraints)
+  //               : widget.style.layoutCellStack(
+  //                 (context, constraints) => [
+  //                   build(date, _focusedDate, widget.locale, constraints),
+  //                   buildMarks(context, constraints),
+  //                 ],
+  //               ))
+  //           : (buildMarks == null
+  //               ? widget.style.layoutCellStack(
+  //                 (context, constraints) => [
+  //                   buildHighlight(context, constraints),
+  //                   build(date, _focusedDate, widget.locale, constraints),
+  //                 ],
+  //               )
+  //               : widget.style.layoutCellStack(
+  //                 (context, constraints) => [
+  //                   buildHighlight(context, constraints),
+  //                   build(date, _focusedDate, widget.locale, constraints),
+  //                   buildMarks(context, constraints),
+  //                 ],
+  //               )),
+  // );
 
   ///
   ///
   ///
-  Widget _dateBuilder(DateTime date) {
-    final style = widget.style;
-    final isOutside = date.month != _focusedDate.value.month;
+  bool _predicateToday(DateTime date) => date.isSameDate(DateTime.now());
 
-    // blocked
-    if (isOutside && _shouldBlockOutsideDays) return Container();
+  bool _predicateSelected(DateTime date) => date.isSameDate(_focusedDate);
 
-    // disabled
-    if (_isDayDisabled(date)) {
-      return _buildCell(
-        date: date,
-        buildContainer: style.builderDisabled,
-        builderMarks:
-            (style.styleCellMark?.forDisabledCell ?? false)
-                ? _builderMarks(date)
-                : null,
-        // buildHighlight: style.styleCellRange?.builderFrom(style, date),
-      );
-    }
+  bool _predicateOutside(DateTime date) => date.month != _focusedDate.month;
 
-    late final CellBuilder builder;
-    // selected
-    if (widget.predicateSelect(date)) {
-      builder = style.builderSelected;
-
-      // outside
-    } else if (isOutside) {
-      builder = style.builderOutside;
-
-      // today
-    } else if (DateTimeExtension.predicateSameDate(date, widget.currentDate)) {
-      builder = style.builderToday;
-
-      // holiday
-    } else if (widget.predicateHoliday(date)) {
-      builder = style.builderHoliday;
-
-      // weekend
-    } else if (style.weekendDays.contains(date.weekday)) {
-      builder = style.builderWeekend;
-
-      // weekday
-    } else {
-      builder = style.builderWeekday;
-    }
-
-    return _buildGesture(
-      date: date,
-      child: _buildCell(
-        date: date,
-        buildContainer: builder,
-        builderMarks: _builderMarks(date),
-        // buildHighlight: style.styleCellRange?.builderFrom(style, date),
-      ),
+  ///
+  ///
+  ///
+  DateTime _paging(int times) {
+    final domain = _domain;
+    final domainStart = domain.start;
+    final domainEnd = domain.end;
+    final date = DateTime(
+      domainStart.year,
+      domainStart.month,
+      domainStart.day + DateTime.daysPerWeek * times,
     );
+    return date.isAfter(domainEnd) ? domainEnd : date;
   }
 
-  ///
-  ///
-  ///
-  ValueChanged<int> _layoutPageOnChange(BoxConstraints constraints) => (index) {
+  void _layoutPageOnChange(int index) {
     if (!_pageCallbackDisabled) {
       final style = widget.style;
       final next =
-          index == _previousIndex
-              ? _focusedDate.value
-              : dm.DateTimeExtension.clamp(
-                style._paging(_indexFormat.value)(
-                  _focusedDate.value,
-                  index - _previousIndex,
-                ),
-                widget.domain.start,
-                widget.domain.end,
-              );
+          index == _indexPrevious
+              ? _focusedDate
+              : _paging(
+                (index - _indexPrevious) *
+                    style.availableWeeksPerPage[_indexWeeksPerPage.value],
+              ).clamp(_domain.start, _domain.end);
 
-      if (!DateTimeExtension.predicateSameDate(_focusedDate.value, next)) {
-        _focusedDate.value = next;
+      if (!_focusedDate.isSameDate(next)) {
+        _focusedDate = next;
       }
-      _height.value = _getPageHeight(constraints);
-      _previousIndex = index;
+      _indexPrevious = index;
       widget.onPageChanged?.call(index, next);
     }
 
     _pageCallbackDisabled = false;
-  };
+  }
+
+  BoxConstraints? _constraintsBody;
+
+  double get heightRow {
+    final style = widget.style;
+    return (_constraintsBody!.maxHeight -
+            style.tablePadding.vertical -
+            (style.styleDayOfWeek?.height ?? 0.0)) /
+        // weeksPerPage;
+        style.availableWeeksPerPage[_indexWeeksPerPage.value];
+  }
 
   Widget _buildPage(BuildContext context, double value, Widget? child) =>
       AnimatedSize(
@@ -488,85 +443,85 @@ class _CalendarState<T> extends State<Calendar<T>> {
         child: SizedBox(height: value, child: child),
       );
 
-  ///
-  ///
-  ///
-  double? _heightPageRow(BoxConstraints constraints) {
-    final style = widget.style;
-    return constraints.hasBoundedHeight
-        ? (constraints.maxHeight - (style.styleDayOfWeek?.height ?? 0.0)) /
-            style.initialWeeksPerPage
-        : style.rowHeight;
+  Predicator<DateTime> get predicateBlock {
+    final domain = widget.style.domain(widget.focusedDate);
+    return (date) => date.isBefore(domain.start) || date.isAfter(domain.end);
   }
 
-  NullableIndexedWidgetBuilder _builderPageItem(BoxConstraints constraints) => (
-    BuildContext context,
-    int index,
-  ) {
+  ///
+  ///
+  ///
+  NullableIndexedWidgetBuilder _builderPageItem() {
+    final eventsLayoutMark = widget.eventsLayoutMark;
+    final eventMark = widget.eventMark;
+    final eventLoader = widget.eventLoader;
+
+    final locale = widget.locale;
     final style = widget.style;
-    final dates = DateTimeRangeExtension.datesIn(
-      DateTimeRangeExtension.weeksFrom(
-        dm.DateTimeExtension.clamp(
-          style._paging(_indexFormat.value)(widget.domain.start, index),
-          widget.domain.start,
-          widget.domain.end,
+    final configuration = _configuration;
+
+    final table = style.table(
+      (date) => style.conditionCell(
+        date: date,
+        configuration: configuration,
+        focusedDate: _focusedDate,
+        locale: locale,
+        eventsLayoutMark: eventsLayoutMark,
+        eventMark: eventMark,
+        eventLoader: eventLoader,
+        onTap: () => _onDateTapped(date),
+        onLongPress: () => _onDateLongPressed(date),
+      ),
+      heightRow: heightRow,
+      predicateBlock: predicateBlock,
+
+      // TODO: hide these
+      daysOfWeek: style.styleDayOfWeek?.buildTableRow(
+        predicateWeekend: widget.predicateWeekend,
+        date: _focusedDate,
+        locale: locale,
+        constraints: _constraintsBody!,
+        weekNumberTitle: style.styleWeekNumber?.buildTitle(
+          style.styleDayOfWeek?.height,
         ),
-        count: style.initialWeeksPerPage,
       ),
-    );
-    final weekNumber = style.styleWeekNumber?.build(
-      dates,
-      _heightPageRow(constraints),
-    );
-    final daysOfWeek = style.styleDayOfWeek?.buildTableRow(
-      style: style,
-      days: dates,
-      date: _focusedDate.value,
-      locale: widget.locale,
-      constraints: constraints,
+      builderWeekNumber: style.styleWeekNumber?.builderFrom(predicateBlock),
     );
 
-    return Padding(
-      padding: style.tablePadding,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (weekNumber != null) weekNumber,
-          Expanded(
-            child: Table(
-              border: style.tableBorder,
-              children: [
-                if (daysOfWeek != null) daysOfWeek,
-                ...List.generate(
-                  dates.length ~/ DateTime.daysPerWeek,
-                  (index) => TableRow(
-                    decoration: style.rowDecoration,
-                    children: List.generate(
-                      DateTime.daysPerWeek,
-                      (id) => SizedBox(
-                        height: _heightPageRow(constraints),
-                        child: _dateBuilder(
-                          dates[index * DateTime.daysPerWeek + id],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  };
+    // TODO: preload cells builders
+
+    final pageDays =
+        DateTime.daysPerWeek *
+        style.availableWeeksPerPage[_indexWeeksPerPage.value];
+    final paging = _paging;
+    return (context, index) {
+      final start = paging(index * pageDays);
+      return table(
+        List.generate(
+          pageDays,
+          (index) => DateTime(start.year, start.month, start.day + index),
+        ),
+      );
+    };
+  }
 
   ///
   ///
   ///
-  Widget buildHeader(BuildContext context, StyleHeader style) {
+  void _updateFormatIndex(int index) {
+    if (index == _indexWeeksPerPage.value) return;
+    final style = widget.style;
+    _indexWeeksPerPage.value = index;
+    final weeksPerPage = style.availableWeeksPerPage[index];
+    _pageHeight.value = heightRow;
+    style.onFormatChanged?.call(weeksPerPage);
+  }
+
+  Widget buildHeader(BuildContext context, CalendarStyleHeader style) {
     final buildFormatButton = style.styleFormatButton?.buildFrom(
       widget.style,
-      _indexFormat,
+      _indexWeeksPerPage,
+      (index) => _updateFormatIndex(index),
     );
     final buildChevron = style.styleChevrons?.buildFrom;
     return Container(
@@ -582,7 +537,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
               duration: widget.style.pageStepDuration,
               curve: widget.style.pageStepCurve,
             ),
-          style.buildTitle(_focusedDate.value, widget.locale),
+          style.buildTitle(_focusedDate, widget.locale),
           if (buildFormatButton != null) buildFormatButton(context),
           if (buildChevron != null)
             buildChevron(
@@ -603,12 +558,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ) => _TableCalendarVerticalDrag(
     currentIndex: value,
     maxIndex: widget.style.availableWeeksPerPage.length - 1,
-    onNextFormatIndex: (index) {
-      if (index == _indexFormat.value) return;
-      final style = widget.style;
-      style.onFormatChanged?.call(style.availableWeeksPerPage[index]);
-      _indexFormat.value = index;
-    },
+    onNextFormatIndex: _updateFormatIndex,
     child: child,
   );
 
@@ -616,27 +566,23 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   Widget _layout(BuildContext context, BoxConstraints constraints) {
-    final style = widget.style;
+    _constraintsBody = constraints;
     return ValueListenableBuilder<double>(
-      valueListenable: _height,
+      valueListenable: _pageHeight,
       builder: _buildPage,
       child: PageView.builder(
-        onPageChanged: _layoutPageOnChange(constraints),
+        onPageChanged: _layoutPageOnChange,
         controller: _pageController,
-        physics: style.horizontalScroll,
-        itemCount: DateTimeRangeExtension.scopesOf(
-          widget.domain,
-          style.startingWeekday,
-          DateTime.daysPerWeek * style.weeksPerPage(_indexFormat.value),
-        ),
-        itemBuilder: _builderPageItem(constraints),
+        physics: widget.style.horizontalScroll,
+        itemCount: _indexEnd,
+        itemBuilder: _builderPageItem(),
       ),
     );
   }
 
   Widget _layoutDragAble(BuildContext context, BoxConstraints constraints) =>
       ValueListenableBuilder<int>(
-        valueListenable: _indexFormat,
+        valueListenable: _indexWeeksPerPage,
         builder: _buildBodyVerticalDragAble,
         child: _layout(context, constraints),
       );
@@ -689,10 +635,10 @@ class _TableCalendarVerticalDragState extends State<_TableCalendarVerticalDrag>
       onVerticalDragStart: onDragStart,
       onVerticalDragUpdate: onDragUpdateFrom(),
       onVerticalDragEnd: onDragEndFrom(
-        difference: GestureDetectorDragMixin.verticalDifference,
+        difference: OffsetExtension.differenceVertical,
         threshold: 25.0,
-        direction: GestureDetectorDragMixin.verticalForward,
-        onDrag: GestureDetectorDragMixin.indexingByVerticalDrag(
+        direction: DirectionIn4.verticalForward,
+        onDrag: FValueChanged.indexingByVerticalDrag(
           onIndex: widget.onNextFormatIndex,
           currentIndex: widget.currentIndex,
           maxIndex: widget.maxIndex,
@@ -706,32 +652,29 @@ class _TableCalendarVerticalDragState extends State<_TableCalendarVerticalDrag>
 ///
 ///
 ///
-// class _TableCalendarRange extends StatefulWidget {
-//   const _TableCalendarRange({
-//     super.key,
-//     required this.style,
-//     required this.styleCellRange,
-//     required this.constraints,
-//     required this.date,
-//   });
-//
-//   final CalendarStyle style;
-//   final CalendarStyleCellRange styleCellRange;
-//   final BoxConstraints constraints;
-//
-//   // final ValueNotifier<DateTime> focusedDate;
-//   // final DateTime focusedDate;
-//
-//   @override
-//   State<_TableCalendarRange> createState() => _TableCalendarRangeState();
-// }
-//
-// class _TableCalendarRangeState extends State<_TableCalendarRange> {
-//   DateTime? rangeStart;
-//   DateTime? rangeEnd;
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return const Placeholder();
-//   }
-// }
+class _TableCalendarRange extends StatefulWidget {
+  const _TableCalendarRange({
+    required this.style,
+    required this.styleCellRange,
+    required this.constraints,
+    required this.range,
+  });
+
+  final CalendarStyle style;
+  final CalendarStyleCellRange styleCellRange;
+  final BoxConstraints constraints;
+  final ValueNotifier<(DateTime?, DateTime?)> range;
+
+  @override
+  State<_TableCalendarRange> createState() => _TableCalendarRangeState();
+}
+
+class _TableCalendarRangeState extends State<_TableCalendarRange> {
+  DateTime? rangeStart;
+  DateTime? rangeEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Placeholder();
+  }
+}

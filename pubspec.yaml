@@ -7,11 +7,12 @@ environment:
   sdk: ^3.7.2
 
 dependencies:
-  damath: ^0.0.39
-  datter: ^0.0.19
   flutter:
     sdk: flutter
+
   intl: ^0.20.2
+  damath: ^0.0.42
+  datter: ^0.0.23
   # path: ^1.8.0
 
 dev_dependencies:

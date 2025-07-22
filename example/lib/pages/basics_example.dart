@@ -19,15 +19,10 @@ class _TableBasicsExampleState extends State<TableBasicsExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       appBar: AppBar(title: const Text('TableCalendar - Basics')),
       body: Calendar(
-        firstDay: kFirstDay,
-        lastDay: kLastDay,
-        focusedDay: _focusedDay,
-        styleHeader: StyleHeader(),
-        predicateSelect: (day) {
-          return isSameDay(_selectedDay, day);
-        },
+        focusedDate: _focusedDay,
         onDaySelected: (selectedDay, focusedDay) {
           if (!isSameDay(_selectedDay, selectedDay)) {
             // Call `setState()` when updating the selected day

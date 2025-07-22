@@ -20,7 +20,7 @@ class _TableComplexExampleState extends State<TableComplexExample> {
     hashCode: getHashCode,
   );
 
-  RangeSelectionMode _rangeSelectionMode = RangeSelectionMode.toggledOff;
+  // RangeSelectionMode _rangeSelectionMode = RangeSelectionMode.toggledOff;
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
 
@@ -66,7 +66,7 @@ class _TableComplexExampleState extends State<TableComplexExample> {
       _focusedDay.value = focusedDay;
       _rangeStart = null;
       _rangeEnd = null;
-      _rangeSelectionMode = RangeSelectionMode.toggledOff;
+      // _rangeSelectionMode = RangeSelectionMode.toggledOff;
     });
 
     _selectedEvents.value = _getEventsForDays(_selectedDays);
@@ -78,7 +78,7 @@ class _TableComplexExampleState extends State<TableComplexExample> {
       _rangeStart = start;
       _rangeEnd = end;
       _selectedDays.clear();
-      _rangeSelectionMode = RangeSelectionMode.toggledOn;
+      // _rangeSelectionMode = RangeSelectionMode.toggledOn;
     });
 
     if (start != null && end != null) {
@@ -93,6 +93,7 @@ class _TableComplexExampleState extends State<TableComplexExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       appBar: AppBar(title: const Text('TableCalendar - Complex')),
       body: Center(
         child: Container(
@@ -102,12 +103,9 @@ class _TableComplexExampleState extends State<TableComplexExample> {
           width: 300,
           height: 300,
           child: Calendar<Event>(
-            firstDay: kFirstDay,
-            lastDay: kLastDay,
-            focusedDay: _focusedDay.value,
+            focusedDate: _focusedDay.value,
             styleHeader: null,
-            predicateSelect: (day) => _selectedDays.contains(day),
-            rangeSelectionMode: _rangeSelectionMode,
+            // rangeSelectionMode: _rangeSelectionMode,
             eventLoader: _getEventsForDay,
             predicateHoliday: (day) {
               // Every 20th day of the month will be treated as a holiday

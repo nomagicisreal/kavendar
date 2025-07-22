@@ -13,8 +13,8 @@ class TableEventsExample extends StatefulWidget {
 
 class _TableEventsExampleState extends State<TableEventsExample> {
   late final ValueNotifier<List<Event>> _selectedEvents;
-  RangeSelectionMode _rangeSelectionMode = RangeSelectionMode
-      .toggledOff; // Can be toggled on/off by longpressing a date
+  // RangeSelectionMode _rangeSelectionMode = RangeSelectionMode
+  //     .toggledOff; // Can be toggled on/off by longpressing a date
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   DateTime? _rangeStart;
@@ -53,7 +53,7 @@ class _TableEventsExampleState extends State<TableEventsExample> {
         _focusedDay = focusedDay;
         _rangeStart = null; // Important to clean those
         _rangeEnd = null;
-        _rangeSelectionMode = RangeSelectionMode.toggledOff;
+        // _rangeSelectionMode = RangeSelectionMode.toggledOff;
       });
 
       _selectedEvents.value = _getEventsForDay(selectedDay);
@@ -66,7 +66,7 @@ class _TableEventsExampleState extends State<TableEventsExample> {
       _focusedDay = focusedDay;
       _rangeStart = start;
       _rangeEnd = end;
-      _rangeSelectionMode = RangeSelectionMode.toggledOn;
+      // _rangeSelectionMode = RangeSelectionMode.toggledOn;
     });
 
     // `start` or `end` could be null
@@ -82,15 +82,13 @@ class _TableEventsExampleState extends State<TableEventsExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // backgroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       appBar: AppBar(title: const Text('TableCalendar - Events')),
       body: Column(
         children: [
           Calendar<Event>(
-            firstDay: kFirstDay,
-            lastDay: kLastDay,
-            focusedDay: _focusedDay,
-            predicateSelect: (day) => isSameDay(_selectedDay, day),
-            rangeSelectionMode: _rangeSelectionMode,
+            focusedDate: _focusedDay,
+            // rangeSelectionMode: _rangeSelectionMode,
             eventLoader: _getEventsForDay,
             style: CalendarStyle(
               startingWeekday: DateTime.monday,
