@@ -107,14 +107,16 @@ class _TableComplexExampleState extends State<TableComplexExample> {
             styleHeader: null,
             // rangeSelectionMode: _rangeSelectionMode,
             eventLoader: _getEventsForDay,
-            predicateHoliday: (day) {
-              // Every 20th day of the month will be treated as a holiday
-              return day.day == 20;
-            },
-            onDaySelected: _onDaySelected,
-            onRangeSelected: _onRangeSelected,
-            onPageChanged: (index, focusedDay) =>
-                _focusedDay.value = focusedDay,
+            style: CalendarStyle(
+              predicateHoliday: (day) {
+                // Every 20th day of the month will be treated as a holiday
+                return day.day == 20;
+              },
+              onDaySelected: _onDaySelected,
+              onRangeSelected: _onRangeSelected,
+              onPageChanged: (index, focusedDay) =>
+                  _focusedDay.value = focusedDay,
+            ),
           ),
         ),
       ),

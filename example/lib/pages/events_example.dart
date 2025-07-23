@@ -92,13 +92,13 @@ class _TableEventsExampleState extends State<TableEventsExample> {
             eventLoader: _getEventsForDay,
             style: CalendarStyle(
               startingWeekday: DateTime.monday,
-            ),
-            onDaySelected: _onDaySelected,
-            onRangeSelected: _onRangeSelected,
+              onDaySelected: _onDaySelected,
+              onRangeSelected: _onRangeSelected,
 
-            onPageChanged: (index, focusedDay) {
-              _focusedDay = focusedDay;
-            },
+              onPageChanged: (index, focusedDay) {
+                _focusedDay = focusedDay;
+              },
+            ),
           ),
           const SizedBox(height: 8.0),
           Expanded(

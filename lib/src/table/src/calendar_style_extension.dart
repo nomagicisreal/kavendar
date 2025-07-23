@@ -57,7 +57,7 @@ class CalendarStyleHeader {
     this.titleCentered = false,
     this.titleTextFormatter,
     this.titleTextStyle = const TextStyle(fontSize: 17.0),
-    this.styleFormatButton = const StyleTextButton(),
+    this.styleFormatButton,
     this.styleChevrons = const StyleChevrons(),
 
     DateLocaleBuilder? builderTitle,
@@ -99,7 +99,7 @@ class CalendarStyleWeekNumber {
     this.textStyle = const TextStyle(fontSize: 12, color: Color(0xFFBFBFBF)),
   });
 
-  DateRowCellBuilder builderFrom(Predicator<DateTime> predicateBlock) =>
+  DateHeightBuilder builderFrom(Predicator<DateTime> predicateBlock) =>
       (startingDate, heightRow) =>
           !predicateBlock(startingDate) ||
                   !predicateBlock(
@@ -139,7 +139,7 @@ class CalendarStyleDayOfWeek {
   final Decoration decoration;
   final TextStyle weekdayStyle;
   final TextStyle weekendStyle;
-  final CellBuilder? _b;
+  final CellConstraintsBuilder? _b;
 
   const CalendarStyleDayOfWeek({
     this.height = 16.0,
@@ -147,14 +147,14 @@ class CalendarStyleDayOfWeek {
     this.decoration = const BoxDecoration(),
     this.weekdayStyle = const TextStyle(color: Color(0xFF4F4F4F)),
     this.weekendStyle = const TextStyle(color: Color(0xFF6A6A6A)),
-    CellBuilder? builderDayOfWeek,
+    CellConstraintsBuilder? builderDayOfWeek,
   }) : _b = builderDayOfWeek;
 
   // Defaults to simple `'E'` format (i.e. Mon, Tue, Wed, etc.).
   static String _formatter(DateTime date, dynamic locale) =>
       DateFormat.E(locale).format(date);
 
-  static CellBuilder _builder(
+  static CellConstraintsBuilder _builder(
     Predicator<DateTime> predicateWeekend,
     CalendarStyleDayOfWeek styleDayOfWeek,
   ) =>
@@ -170,9 +170,9 @@ class CalendarStyleDayOfWeek {
         ),
       );
 
-  TableRow Function(List<DateTime> dates) buildTableRow({
+  TableRow Function(List<DateTime> dates) buildFrom({
     required Predicator<DateTime> predicateWeekend,
-    required DateTime date,
+    required DateTime focusedDate,
     required dynamic locale,
     required BoxConstraints constraints,
     required Widget? weekNumberTitle,
@@ -184,7 +184,7 @@ class CalendarStyleDayOfWeek {
       DateTime.daysPerWeek,
       (index) => SizedBox(
         height: height,
-        child: builder(dates[index], date, locale, constraints),
+        child: builder(dates[index], focusedDate, locale, constraints),
       ),
     );
     final row =
@@ -205,18 +205,16 @@ class CalendarStyleDayOfWeek {
 ///
 class CalendarStyleCellMark {
   final int max;
-  final bool disableDisabledCell;
   final double? size;
   final double sizeScale;
   final double sizeAnchor;
   final EdgeInsets margin;
   final EdgeInsets marginCell;
   final Decoration decoration;
-  final StylePositionedLayout<CalendarStyleCellMark> childrenPosition;
+  final PositionedLayout? _layout;
 
   const CalendarStyleCellMark({
     this.max = 4,
-    this.disableDisabledCell = true,
     this.size,
     this.sizeScale = 0.2,
     this.sizeAnchor = 0.7,
@@ -226,12 +224,14 @@ class CalendarStyleCellMark {
       color: Color(0xFF263238),
       shape: BoxShape.circle,
     ),
-    this.childrenPosition = _position,
-  });
+    PositionedLayout? layout,
+  }) : _layout = layout;
 
-  static Positioned4Double _position(
-    CalendarStyleCellMark style,
-    BoxConstraints constraints,
+  ///
+  ///
+  ///
+  static PositionedLayout _layoutFrom(CalendarStyleCellMark style) => (
+    constraints,
   ) {
     final shorterSide = FBoxConstraints.shortSide(constraints);
     return (
@@ -245,13 +245,14 @@ class CalendarStyleCellMark {
       null,
       null,
     );
-  }
+  };
+
+  PositionedLayout get layout => _layout ?? _layoutFrom(this);
 
   ///
   ///
   ///
-  static EventBuilder<T> _singleDecoration<T>(
-    BoxConstraints constraints,
+  static EventSingleBuilder<T> _singleDecoration<T>(
     CalendarStyleCellMark style,
   ) =>
       (day, event) => Container(
@@ -261,47 +262,50 @@ class CalendarStyleCellMark {
         decoration: style.decoration,
       );
 
-  static EventsBuilder<T> _eventsAsPositionedRow<T>(
-    BoxConstraints constraints,
-    CalendarStyleCellMark style,
-  ) => (dateTime, events, mark) {
-    if (events.isEmpty) return null;
-    final position = style.childrenPosition(style, constraints);
-    return PositionedDirectional(
-      start: position.$1,
-      top: position.$2,
-      end: position.$3,
-      bottom: position.$4,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: events
-            .take(style.max)
-            .fold(
-              [],
-              (list, event) => list..addIfNotNull(mark(dateTime, event)),
-            ),
-      ),
-    );
-  };
+  static EventsBuilder<T> _allPositionedRow<T>(CalendarStyleCellMark style) {
+    final layout = style.layout;
+    return (constraints, dateTime, events, mark) {
+      if (events.isEmpty) return null;
+      final positioned = layout(constraints);
+      return PositionedDirectional(
+        start: positioned.$1,
+        top: positioned.$2,
+        end: positioned.$3,
+        bottom: positioned.$4,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: events
+              .take(style.max)
+              .fold(
+                [],
+                (list, event) => list..addIfNotNull(mark(dateTime, event)),
+              ),
+        ),
+      );
+    };
+  }
 
-  ConstraintsBuilder? builderFrom<T>({
-    required DateTime date,
-    required List<T> Function(DateTime date)? eventLoader,
-    required EventsLayoutMark<T>? eventsLayoutMark,
-    required EventMark<T>? eventMark,
-    required bool disable,
+  ConstraintsDateCellTypeBuilder? builderFrom<T>({
+    required EventLoader<T>? eventLoader,
+    required EventsLayoutMark<T>? layoutAll,
+    required EventElementMark<T>? layoutElement,
+    required MarkConfiguration<T>? customMark,
   }) {
-    if (disable) return null;
-    final events = eventLoader?.call(date);
-    if (events == null) return null;
-    final layoutAllMark = eventsLayoutMark ?? _eventsAsPositionedRow<T>;
-    final mark = eventMark ?? _singleDecoration<T>;
-    return (_, constraints) =>
-        layoutAllMark(constraints, this)(
-          date,
-          events,
-          mark(constraints, this),
-        )!;
+    if (eventLoader == null) return null;
+    if (customMark == null) {
+      final layout = (layoutAll ?? _allPositionedRow<T>)(this);
+      final mark = (layoutElement ?? _singleDecoration<T>)(this);
+      return (constraints, date, cellType) =>
+          layout(constraints, date, eventLoader(date), mark)!;
+    } else {
+      return (constraints, date, cellType) {
+        final builder = customMark[cellType];
+        if (builder == null) return null;
+        final layout = (builder.$1 ?? _allPositionedRow<T>)(this);
+        final mark = (builder.$2 ?? _singleDecoration<T>)(this);
+        return layout(constraints, date, eventLoader(date), mark)!;
+      };
+    }
   }
 }
 
@@ -309,12 +313,13 @@ class CalendarStyleCellMark {
 ///
 ///
 class CalendarStyleCellRange {
-  final CellBuilder? _bStart;
-  final CellBuilder? _bWithin;
-  final CellBuilder? _bEnd;
+  final CellConstraintsBuilder? _bStart;
+  final CellConstraintsBuilder? _bWithin;
+  final CellConstraintsBuilder? _bEnd;
   final ConstraintsRangeBuilder? _bHighlight;
   final HighlightWidthFrom<CalendarStyle> widthFrom;
-  final bool disableDisabledCell;
+  final Map<CalendarCellType, (RangeState3, CellConstraintsBuilder?)>?
+  customBuilder;
 
   ///
   ///
@@ -356,12 +361,12 @@ class CalendarStyleCellRange {
     ///
     ///
     ///
-    CellBuilder? builderRangeStart,
-    CellBuilder? builderRangeIn,
-    CellBuilder? builderRangeEnd,
+    CellConstraintsBuilder? builderRangeStart,
+    CellConstraintsBuilder? builderRangeIn,
+    CellConstraintsBuilder? builderRangeEnd,
     ConstraintsRangeBuilder? builderRangeHighlight,
     this.widthFrom = _widthFrom,
-    this.disableDisabledCell = true,
+    this.customBuilder,
   }) : _bStart = builderRangeStart,
        _bWithin = builderRangeIn,
        _bEnd = builderRangeEnd,
@@ -374,7 +379,7 @@ class CalendarStyleCellRange {
   ///
   ///
   ///
-  static CellBuilder _builderRangeWithin(
+  static CellConstraintsBuilder _builderRangeWithin(
     CalendarStyle style,
     CalendarStyleCellRange styleRange,
   ) =>
@@ -386,7 +391,7 @@ class CalendarStyleCellRange {
         textStyle: styleRange.rangeWithinTextStyle,
       );
 
-  static CellBuilder _builderRangeEnd(
+  static CellConstraintsBuilder _builderRangeEnd(
     CalendarStyle style,
     CalendarStyleCellRange styleRange,
   ) =>
@@ -398,7 +403,7 @@ class CalendarStyleCellRange {
         textStyle: styleRange.rangeEndTextStyle,
       );
 
-  static CellBuilder _builderRangeStart(
+  static CellConstraintsBuilder _builderRangeStart(
     CalendarStyle style,
     CalendarStyleCellRange styleRange,
   ) =>
@@ -439,13 +444,11 @@ class CalendarStyleCellRange {
   /// 3. rangeStart != null, rangeEnd != null -> expand range, shrink range, unselect rangeEnd
   ///
   ///
-  ConstraintsBuilder? builderFrom({
+  ConstraintsDateBuilder? builderFrom({
     required CalendarStyle style,
-    required DateTime date,
     required bool isBackground,
-    bool disable = false,
   }) {
-    if (disable) return null;
+    // final builder = customBuilder;
     throw UnimplementedError();
     // final rangeStart = _rangeStart;
     // if (rangeStart == null) return null;

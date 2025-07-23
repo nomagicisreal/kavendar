@@ -1,3 +1,10 @@
+
+import 'package:damath/damath.dart';
+
+///
+/// rename [printThing] to printThis with mapper and Object?
+///
+///
 extension DTExt on DateTime {
   ///
   /// [isSameDate], [isDifferentDate]
@@ -20,8 +27,11 @@ extension DTExt on DateTime {
       second != another.second;
 
   ///
+  /// [dateOnly], [timeOnly], [plus]
   ///
-  ///
+  DateTime get dateOnly => DateTime(year, month, day);
+  Duration get timeOnly => Duration(hours: hour, minutes: minute, seconds: second);
+
   DateTime plus({
     int year = 0,
     int month = 0,
@@ -113,4 +123,20 @@ extension DTExt on DateTime {
   );
 
   DateTime dateAddDays(int n) => DateTime(year, month, day + n);
+
+  ///
+  /// [dates], [datesFromNow]
+  /// [datesReversed], [datesFromNowReversed]
+  ///
+  List<DateTime> dates(int length, [int from = 0]) =>
+      List.generate(length, (i) => DateTime(year, month, day + from + i));
+
+  List<DateTime> datesFromNow(int length) =>
+      List.generate(length, (i) => DateTime(year, month, day + i));
+
+  List<DateTime> datesReversed(int length, [int from = 0]) =>
+      List.generate(length, (i) => DateTime(year, month, day + from - i));
+
+  List<DateTime> datesFromNowReversed(int length) =>
+      List.generate(length, (i) => DateTime(year, month, day - i));
 }

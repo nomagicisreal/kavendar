@@ -1,6 +1,27 @@
 import 'package:damath/damath.dart';
 import 'package:flutter/material.dart';
+import 'package:kavendar/kavendar.dart';
 import 'package:kavendar/src/custom/damath.dart';
+
+///
+/// remove [printThis]
+/// remove all utc
+///
+typedef ConstraintsDateBuilder =
+    Widget Function(BoxConstraints constraints, DateTime date);
+
+typedef ConstraintsDateCellTypeBuilder =
+    Widget? Function(
+      BoxConstraints constraints,
+      DateTime date,
+      CalendarCellType cellType,
+    );
+
+///
+/// remove StylePositionedLayout
+///
+typedef PositionedLayout =
+    Positioned4Double Function(BoxConstraints constraints);
 
 ///
 ///
@@ -8,6 +29,8 @@ import 'package:kavendar/src/custom/damath.dart';
 ///
 ///
 extension DTRExt on DateTimeRange {
+  DateTimeRange get normalized => DateTimeRange(start: start.normalized, end: end.normalized);
+
   ///
   /// [scopeFrom], [scopeMonthsFrom]
   ///

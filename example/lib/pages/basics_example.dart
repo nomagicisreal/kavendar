@@ -23,19 +23,21 @@ class _TableBasicsExampleState extends State<TableBasicsExample> {
       appBar: AppBar(title: const Text('TableCalendar - Basics')),
       body: Calendar(
         focusedDate: _focusedDay,
-        onDaySelected: (selectedDay, focusedDay) {
-          if (!isSameDay(_selectedDay, selectedDay)) {
-            // Call `setState()` when updating the selected day
-            setState(() {
-              _selectedDay = selectedDay;
-              _focusedDay = focusedDay;
-            });
-          }
-        },
-        onPageChanged: (index, focusedDay) {
-          // No need to call `setState()` here
-          _focusedDay = focusedDay;
-        },
+        style: CalendarStyle(
+          onDaySelected: (selectedDay, focusedDay) {
+            if (!isSameDay(_selectedDay, selectedDay)) {
+              // Call `setState()` when updating the selected day
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
+            }
+          },
+          onPageChanged: (index, focusedDay) {
+            // No need to call `setState()` here
+            _focusedDay = focusedDay;
+          },
+        ),
       ),
     );
   }

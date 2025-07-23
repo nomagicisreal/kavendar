@@ -68,11 +68,13 @@ class _TableMultiExampleState extends State<TableMultiExample> {
           Calendar<Event>(
             focusedDate: _focusedDay,
             eventLoader: _getEventsForDay,
-            style: CalendarStyle(startingWeekday: DateTime.monday),
-            onDaySelected: _onDaySelected,
-            onPageChanged: (index, focusedDay) {
-              _focusedDay = focusedDay;
-            },
+            style: CalendarStyle(
+              startingWeekday: DateTime.monday,
+              onDaySelected: _onDaySelected,
+              onPageChanged: (index, focusedDay) {
+                _focusedDay = focusedDay;
+              },
+            ),
           ),
           ElevatedButton(
             child: const Text('Clear selection'),

@@ -10,12 +10,7 @@ part of '../table_calendar.dart';
 class Calendar<T> extends StatefulWidget {
   final dynamic locale;
   final DateTime? _focusedDate;
-  final bool pageJumpingEnabled;
-  final bool pageAnimationEnabled;
-  final int initialWeeksPerPage;
-  final Duration formatAnimationDuration;
-  final Curve formatAnimationCurve;
-  final HitTestBehavior dateHitTestBehavior;
+  final int weeksPerPage;
 
   ///
   ///
@@ -23,62 +18,30 @@ class Calendar<T> extends StatefulWidget {
   final CalendarStyle style;
   final CalendarStyleHeader? styleHeader;
   final EventsLayoutMark<T>? eventsLayoutMark;
-  final EventMark<T>? eventMark;
+  final EventElementMark<T>? eventLayoutSingleMark;
   final EventLoader<T>? eventLoader;
+  final MarkConfiguration<T>? customMark;
 
   ///
   ///
   ///
   // final RangeSelectionMode rangeSelectionMode;
-  final Predicator<DateTime> predicateDisable;
-  final Predicator<DateTime> predicateHoliday;
-  final Predicator<DateTime> predicateWeekend;
-  final Predicator<DateTime> predicateWeekday;
-  final OnRangeSelected? onRangeSelected;
-  final OnDaySelected? onDaySelected;
-  final OnDaySelected? onDateLongPressed;
-  final OnPageChanged? onPageChanged;
-  final void Function(DateTime date)? onDisabledDayTapped;
-  final void Function(DateTime date)? onDisabledDayLongPressed;
-  final void Function(PageController pageController)? onCalendarCreated;
 
   Calendar({
     super.key,
     DateTime? focusedDate,
     this.locale,
-    this.initialWeeksPerPage = CalendarStyle.weeksPerPage_6,
-    this.pageJumpingEnabled = true,
-    this.pageAnimationEnabled = true,
-    this.formatAnimationDuration = DurationExtension.milli200,
-    this.formatAnimationCurve = Curves.linear,
-    this.dateHitTestBehavior = HitTestBehavior.opaque,
-
-    ///
-    ///
-    ///
+    this.weeksPerPage = CalendarStyle.weeksPerPage_6,
     this.style = const CalendarStyle(),
     this.styleHeader = const CalendarStyleHeader(),
     this.eventsLayoutMark,
-    this.eventMark,
-
-    ///
-    ///
-    ///
-    // this.rangeSelectionMode = RangeSelectionMode.toggledOff,
+    this.eventLayoutSingleMark,
     this.eventLoader,
-    this.predicateDisable = _datePredicateFalse,
-    this.predicateHoliday = _datePredicateFalse,
-    this.predicateWeekend = _datePredicateWeekend,
-    this.predicateWeekday = _datePredicateWeekday,
-    this.onRangeSelected,
-    this.onDaySelected,
-    this.onDateLongPressed,
-    this.onDisabledDayTapped,
-    this.onDisabledDayLongPressed,
-    this.onPageChanged,
-    this.onCalendarCreated,
+    this.customMark,
+
+    // this.rangeSelectionMode = RangeSelectionMode.toggledOff,
   }) : _focusedDate = focusedDate,
-       assert(style.availableWeeksPerPage.contains(initialWeeksPerPage)),
+       assert(style.availableWeeksPerPage.contains(weeksPerPage)),
        assert(
          style.availableWeeksPerPage.length <=
              CalendarStyle.weeksPerPage_all.length,
@@ -91,9 +54,11 @@ class Calendar<T> extends StatefulWidget {
              focusedDate.isBefore(domain.end);
        }(), 'focusedDay($focusedDate) must between domain(${style.domain})'),
        assert(() {
+         final weekend = style.predicateWeekend;
+         final weekday = style.predicateWeekday;
          var date = DateTime.now();
          for (var i = 0; i < 7; i++) {
-           if (predicateWeekend(date) == predicateWeekday(date)) return false;
+           if (weekend(date) == weekday(date)) return false;
          }
          return true;
        }());
@@ -102,31 +67,13 @@ class Calendar<T> extends StatefulWidget {
   State<Calendar<T>> createState() => _CalendarState<T>();
 
   DateTime get focusedDate => _focusedDate ?? DateTime.now();
-
-  ///
-  ///
-  ///
-  static bool _datePredicateFalse(DateTime date) => false;
-
-  static bool _datePredicateWeekend(DateTime date) {
-    final day = date.weekday;
-    return day == DateTime.sunday || day == DateTime.saturday;
-  }
-
-  static bool _datePredicateWeekday(DateTime date) {
-    final day = date.weekday;
-    return day == DateTime.monday ||
-        day == DateTime.tuesday ||
-        day == DateTime.wednesday ||
-        day == DateTime.thursday ||
-        day == DateTime.friday;
-  }
 }
 
 ///
 ///
 ///
 class _CalendarState<T> extends State<Calendar<T>> {
+  late CalendarStyle _style;
   late final CalendarCellContainer _configuration;
   late final PageController _pageController;
   late final ValueNotifier<double> _pageHeight;
@@ -172,13 +119,14 @@ class _CalendarState<T> extends State<Calendar<T>> {
   @override
   void initState() {
     super.initState();
-    final focusedDate = widget.focusedDate;
     final style = widget.style;
-    final wPP = widget.initialWeeksPerPage;
+    final focusedDate = widget.focusedDate;
     final domain = style.domain(focusedDate);
+    _style = style;
     _domain = domain;
     _focusedDate = focusedDate;
 
+    final wPP = widget.weeksPerPage;
     final indexPageInitial = _indexPage(domain.start, focusedDate, wPP);
     _indexPrevious = indexPageInitial;
     _indexEnd = _indexPage(domain.start, domain.end, wPP);
@@ -192,16 +140,16 @@ class _CalendarState<T> extends State<Calendar<T>> {
     _pageCallbackDisabled = false;
 
     _configuration = {
-      CalendarCellType.disabled: (widget.predicateDisable, style.buildDisabled),
-      CalendarCellType.holiday: (widget.predicateHoliday, style.buildHoliday),
-      CalendarCellType.weekend: (widget.predicateWeekend, style.buildWeekend),
-      CalendarCellType.weekday: (widget.predicateWeekday, style.buildWeekday),
+      CalendarCellType.disabled: (style.predicateDisable, style.buildDisabled),
+      CalendarCellType.holiday: (style.predicateHoliday, style.buildHoliday),
+      CalendarCellType.weekend: (style.predicateWeekend, style.buildWeekend),
+      CalendarCellType.weekday: (style.predicateWeekday, style.buildWeekday),
       CalendarCellType.selected: (_predicateSelected, style.buildSelected),
       CalendarCellType.outside: (_predicateOutside, style.buildOutside),
       CalendarCellType.today: (_predicateToday, style.buildToday),
     };
 
-    widget.onCalendarCreated?.call(_pageController);
+    style.onCalendarCreated?.call(_pageController);
   }
 
   ///
@@ -246,9 +194,13 @@ class _CalendarState<T> extends State<Calendar<T>> {
   @override
   void didUpdateWidget(Calendar<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_focusedDate != widget.focusedDate || widget.style != oldWidget.style) {
+    final style = widget.style;
+    if (style != oldWidget.style) {
+      _style = style;
+    }
+    if (_focusedDate != widget.focusedDate || style != oldWidget.style) {
       _focusedDate = widget.focusedDate;
-      _updatePage(widget.pageAnimationEnabled);
+      _updatePage(style.pageAnimationEnabled);
     }
 
     // if (_rangeSelectionMode != widget.rangeSelectionMode) {
@@ -264,8 +216,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   void _onDateTapped(DateTime date) {
-    if (widget.predicateDisable(date)) {
-      return widget.onDisabledDayTapped?.call(date);
+    final style = _style;
+    if (style.predicateDisable(date)) {
+      return style.onDisabledDayTapped?.call(date);
     }
 
     _updateFocusOnTap(date);
@@ -289,16 +242,17 @@ class _CalendarState<T> extends State<Calendar<T>> {
   }
 
   void _onDateLongPressed(DateTime date) {
-    if (widget.predicateDisable(date)) {
-      return widget.onDisabledDayLongPressed?.call(date);
+    final style = _style;
+    if (style.predicateDisable(date)) {
+      return style.onDisabledDayLongPressed?.call(date);
     }
 
-    if (widget.onDateLongPressed != null) {
+    if (style.onDateLongPressed != null) {
       _updateFocusOnTap(date);
-      return widget.onDateLongPressed!(date, _focusedDate);
+      return style.onDateLongPressed!(date, _focusedDate);
     }
 
-    if (widget.onRangeSelected != null) {
+    if (style.onRangeSelected != null) {
       // if (_rangeSelectionMode.isToggleAble) {
       //   _updateFocusOnTap(date);
       //   _rangeSelectionMode =
@@ -321,8 +275,8 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   void _updateFocusOnTap(DateTime date) {
-    // print('focused: ${_focusedDate}, date: $date');
-    if (widget.pageJumpingEnabled) {
+    final style = _style;
+    if (style.pageJumpingEnabled) {
       _focusedDate = date;
       setState(() {});
       // TODO: instead of setState, using ValueListenableBuilder
@@ -330,7 +284,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
     }
 
     final focusedDate = _focusedDate;
-    if (widget.initialWeeksPerPage == CalendarStyle.weeksPerPage_6) {
+    if (widget.weeksPerPage == CalendarStyle.weeksPerPage_6) {
       if (date.month < focusedDate.month) {
         _focusedDate = focusedDate.firstDateOfMonth;
       } else if (date.month > focusedDate.month) {
@@ -346,42 +300,6 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   ///
-  // Widget _builderDate({
-  //   required DateTime date,
-  //   required CellBuilder build,
-  //   required ConstraintsBuilder? buildHighlight,
-  //   required ConstraintsBuilder? buildMarks,
-  // }) => LayoutBuilder(
-  //   builder:
-  //       buildHighlight == null
-  //           ? (buildMarks == null
-  //               ? (_, constraints) =>
-  //                   build(date, _focusedDate, widget.locale, constraints)
-  //               : widget.style.layoutCellStack(
-  //                 (context, constraints) => [
-  //                   build(date, _focusedDate, widget.locale, constraints),
-  //                   buildMarks(context, constraints),
-  //                 ],
-  //               ))
-  //           : (buildMarks == null
-  //               ? widget.style.layoutCellStack(
-  //                 (context, constraints) => [
-  //                   buildHighlight(context, constraints),
-  //                   build(date, _focusedDate, widget.locale, constraints),
-  //                 ],
-  //               )
-  //               : widget.style.layoutCellStack(
-  //                 (context, constraints) => [
-  //                   buildHighlight(context, constraints),
-  //                   build(date, _focusedDate, widget.locale, constraints),
-  //                   buildMarks(context, constraints),
-  //                 ],
-  //               )),
-  // );
-
-  ///
-  ///
-  ///
   bool _predicateToday(DateTime date) => date.isSameDate(DateTime.now());
 
   bool _predicateSelected(DateTime date) => date.isSameDate(_focusedDate);
@@ -391,34 +309,49 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   ///
   ///
-  DateTime _paging(int times) {
+  DateTime Function(int days) get _paging {
+    final style = _style;
+    final wPP = style.availableWeeksPerPage[_indexWeeksPerPage.value];
+    late final DateTime domainStart;
+    late final DateTime domainEnd;
     final domain = _domain;
-    final domainStart = domain.start;
-    final domainEnd = domain.end;
-    final date = DateTime(
-      domainStart.year,
-      domainStart.month,
-      domainStart.day + DateTime.daysPerWeek * times,
-    );
-    return date.isAfter(domainEnd) ? domainEnd : date;
+    if (wPP == CalendarStyle.weeksPerPage_6) {
+      domainStart = domain.start.firstDateOfMonth.firstDateOfWeek(
+        style.startingWeekday,
+      );
+      domainEnd = domain.end.firstDateOfMonth.firstDateOfWeek(
+        style.startingWeekday,
+      );
+    } else {
+      throw UnimplementedError();
+    }
+    return (days) {
+      final date = DateTime(
+        domainStart.year,
+        domainStart.month,
+        domainStart.day + days,
+      );
+      return date.isAfter(domainEnd) ? domainEnd : date;
+    };
   }
 
   void _layoutPageOnChange(int index) {
     if (!_pageCallbackDisabled) {
-      final style = widget.style;
+      final style = _style;
       final next =
           index == _indexPrevious
               ? _focusedDate
               : _paging(
                 (index - _indexPrevious) *
+                    DateTime.daysPerWeek *
                     style.availableWeeksPerPage[_indexWeeksPerPage.value],
-              ).clamp(_domain.start, _domain.end);
+              );
 
       if (!_focusedDate.isSameDate(next)) {
         _focusedDate = next;
       }
       _indexPrevious = index;
-      widget.onPageChanged?.call(index, next);
+      style.onPageChanged?.call(index, next);
     }
 
     _pageCallbackDisabled = false;
@@ -427,82 +360,16 @@ class _CalendarState<T> extends State<Calendar<T>> {
   BoxConstraints? _constraintsBody;
 
   double get heightRow {
-    final style = widget.style;
+    final style = _style;
     return (_constraintsBody!.maxHeight -
             style.tablePadding.vertical -
             (style.styleDayOfWeek?.height ?? 0.0)) /
-        // weeksPerPage;
         style.availableWeeksPerPage[_indexWeeksPerPage.value];
   }
-
-  Widget _buildPage(BuildContext context, double value, Widget? child) =>
-      AnimatedSize(
-        duration: widget.formatAnimationDuration,
-        curve: widget.formatAnimationCurve,
-        alignment: Alignment.topCenter,
-        child: SizedBox(height: value, child: child),
-      );
 
   Predicator<DateTime> get predicateBlock {
     final domain = widget.style.domain(widget.focusedDate);
     return (date) => date.isBefore(domain.start) || date.isAfter(domain.end);
-  }
-
-  ///
-  ///
-  ///
-  NullableIndexedWidgetBuilder _builderPageItem() {
-    final eventsLayoutMark = widget.eventsLayoutMark;
-    final eventMark = widget.eventMark;
-    final eventLoader = widget.eventLoader;
-
-    final locale = widget.locale;
-    final style = widget.style;
-    final configuration = _configuration;
-
-    final table = style.table(
-      (date) => style.conditionCell(
-        date: date,
-        configuration: configuration,
-        focusedDate: _focusedDate,
-        locale: locale,
-        eventsLayoutMark: eventsLayoutMark,
-        eventMark: eventMark,
-        eventLoader: eventLoader,
-        onTap: () => _onDateTapped(date),
-        onLongPress: () => _onDateLongPressed(date),
-      ),
-      heightRow: heightRow,
-      predicateBlock: predicateBlock,
-
-      // TODO: hide these
-      daysOfWeek: style.styleDayOfWeek?.buildTableRow(
-        predicateWeekend: widget.predicateWeekend,
-        date: _focusedDate,
-        locale: locale,
-        constraints: _constraintsBody!,
-        weekNumberTitle: style.styleWeekNumber?.buildTitle(
-          style.styleDayOfWeek?.height,
-        ),
-      ),
-      builderWeekNumber: style.styleWeekNumber?.builderFrom(predicateBlock),
-    );
-
-    // TODO: preload cells builders
-
-    final pageDays =
-        DateTime.daysPerWeek *
-        style.availableWeeksPerPage[_indexWeeksPerPage.value];
-    final paging = _paging;
-    return (context, index) {
-      final start = paging(index * pageDays);
-      return table(
-        List.generate(
-          pageDays,
-          (index) => DateTime(start.year, start.month, start.day + index),
-        ),
-      );
-    };
   }
 
   ///
@@ -517,6 +384,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
     style.onFormatChanged?.call(weeksPerPage);
   }
 
+  ///
+  /// TODO: enable format button
+  ///
   Widget buildHeader(BuildContext context, CalendarStyleHeader style) {
     final buildFormatButton = style.styleFormatButton?.buildFrom(
       widget.style,
@@ -551,13 +421,16 @@ class _CalendarState<T> extends State<Calendar<T>> {
     );
   }
 
+  ///
+  /// TODO: has weekNumber -> vertical dragAble to switch page
+  ///
   Widget _buildBodyVerticalDragAble(
     BuildContext context,
     int value,
     Widget? child,
   ) => _TableCalendarVerticalDrag(
     currentIndex: value,
-    maxIndex: widget.style.availableWeeksPerPage.length - 1,
+    maxIndex: _style.availableWeeksPerPage.length - 1,
     onNextFormatIndex: _updateFormatIndex,
     child: child,
   );
@@ -567,15 +440,43 @@ class _CalendarState<T> extends State<Calendar<T>> {
   ///
   Widget _layout(BuildContext context, BoxConstraints constraints) {
     _constraintsBody = constraints;
+    final style = _style;
+    final table = style._tableFrom(
+      style._cellFrom(
+        configuration: _configuration,
+        onTap: _onDateTapped,
+        onLongPress: _onDateLongPressed,
+        buildMarks: style.styleCellMark?.builderFrom(
+          eventLoader: widget.eventLoader,
+          layoutAll: widget.eventsLayoutMark,
+          layoutElement: widget.eventLayoutSingleMark,
+          customMark: widget.customMark,
+        ),
+        buildRangeHighlight: style.styleCellRangeHighlight?.builderFrom(
+          style: style,
+          isBackground: true,
+        ),
+      ),
+      locale: widget.locale,
+      heightRow: heightRow,
+      predicateBlock: predicateBlock,
+      focusedDate: _focusedDate,
+      constraints: constraints,
+    );
+
+    final paging = _paging;
+    final dPP =
+        DateTime.daysPerWeek *
+        style.availableWeeksPerPage[_indexWeeksPerPage.value];
     return ValueListenableBuilder<double>(
       valueListenable: _pageHeight,
-      builder: _buildPage,
+      builder: style._buildPage,
       child: PageView.builder(
         onPageChanged: _layoutPageOnChange,
         controller: _pageController,
         physics: widget.style.horizontalScroll,
         itemCount: _indexEnd,
-        itemBuilder: _builderPageItem(),
+        itemBuilder: (_, i) => table(paging(dPP * i).datesFromNow(dPP)),
       ),
     );
   }

@@ -27,31 +27,33 @@ class _TableRangeExampleState extends State<TableRangeExample> {
       body: Calendar(
         focusedDate: _focusedDay,
         // rangeSelectionMode: _rangeSelectionMode,
-        onDaySelected: (selectedDay, focusedDay) {
-          if (!isSameDay(_selectedDay, selectedDay)) {
+        style: CalendarStyle(
+          onDaySelected: (selectedDay, focusedDay) {
+            if (!isSameDay(_selectedDay, selectedDay)) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+                _rangeStart = null; // Important to clean those
+                _rangeEnd = null;
+                // _rangeSelectionMode = RangeSelectionMode.toggledOff;
+              });
+              print('on date selected');
+            }
+          },
+          onRangeSelected: (start, end, focusedDay) {
             setState(() {
-              _selectedDay = selectedDay;
+              _selectedDay = null;
               _focusedDay = focusedDay;
-              _rangeStart = null; // Important to clean those
-              _rangeEnd = null;
-              // _rangeSelectionMode = RangeSelectionMode.toggledOff;
+              _rangeStart = start;
+              _rangeEnd = end;
+              // _rangeSelectionMode = RangeSelectionMode.toggledOn;
             });
-            print('on date selected');
-          }
-        },
-        onRangeSelected: (start, end, focusedDay) {
-          setState(() {
-            _selectedDay = null;
+            print('on range selected');
+          },
+          onPageChanged: (index, focusedDay) {
             _focusedDay = focusedDay;
-            _rangeStart = start;
-            _rangeEnd = end;
-            // _rangeSelectionMode = RangeSelectionMode.toggledOn;
-          });
-          print('on range selected');
-        },
-        onPageChanged: (index, focusedDay) {
-          _focusedDay = focusedDay;
-        },
+          },
+        ),
       ),
     );
   }
