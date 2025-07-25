@@ -18,6 +18,14 @@ typedef ConstraintsDateCellTypeBuilder =
     );
 
 ///
+///
+///
+typedef PageStepper =
+Future<void> Function({required Duration duration, required Curve curve});
+
+typedef PageStepperBuilder = Widget Function(PageStepper stepper);
+
+///
 /// remove StylePositionedLayout
 ///
 typedef PositionedLayout =

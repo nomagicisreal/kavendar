@@ -104,10 +104,10 @@ class _TableComplexExampleState extends State<TableComplexExample> {
           height: 300,
           child: Calendar<Event>(
             focusedDate: _focusedDay.value,
-            styleHeader: null,
             // rangeSelectionMode: _rangeSelectionMode,
             eventLoader: _getEventsForDay,
             style: CalendarStyle(
+              styleHeader: null,
               predicateHoliday: (day) {
                 // Every 20th day of the month will be treated as a holiday
                 return day.day == 20;

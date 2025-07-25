@@ -6,6 +6,13 @@ part of '../table_calendar.dart';
 ///
 ///
 
+class DecorationTextStyle {
+  final Decoration? decoration;
+  final TextStyle? textStyle;
+
+  const DecorationTextStyle(this.decoration, this.textStyle);
+}
+
 ///
 ///
 ///
@@ -41,32 +48,35 @@ class StyleTextButton {
   static WidgetBuilder? _builderFromList({
     required CalendarStyle style,
     required StyleTextButton styleTextButton,
-    required ValueNotifier<int> indexNotifier,
+    required ValueNotifier<int> weeksPerPageNotifier,
     required ValueChanged<int> notifyChanging,
   }) {
-    final availables = style.availableWeeksPerPage;
+    final availables = style.formatAvailables;
     return (context) => Padding(
       padding: KGeometry.edgeInsets_left_1 * 8,
       child: ValueListenableBuilder(
-        valueListenable: indexNotifier,
-        builder: (context, value, child) {
+        valueListenable: weeksPerPageNotifier,
+        builder: (context, weeksPerPage, child) {
           return InkWell(
             borderRadius: styleTextButton.decoration.borderRadius?.resolve(
               context.textDirection,
             ),
             onTap: () {
-              final index = (value + 1) % availables.length;
-              notifyChanging(index);
-              // indexNotifier.value = index;
-              // final weeksPerPage = availables[index];
-              // pageHeightNotifier.value =
+              final index = availables.indexOf(weeksPerPage);
+              if (index == -1) {
+                throw StateError(
+                  'invalid weeks per page: $weeksPerPage\n'
+                  'availables: $availables}',
+                );
+              }
+              notifyChanging((index + 1) % availables.length);
             },
             child: Container(
               decoration: styleTextButton.decoration,
               padding: styleTextButton.padding,
               child: Text(
-                styleTextButton._texting?.call(indexNotifier.value) ??
-                    _textWeek(availables)(indexNotifier.value),
+                styleTextButton._texting?.call(weeksPerPageNotifier.value) ??
+                    _textWeek(availables)(weeksPerPageNotifier.value),
                 style: styleTextButton.textStyle,
               ),
             ),
@@ -78,14 +88,14 @@ class StyleTextButton {
 
   WidgetBuilder? buildFrom(
     CalendarStyle style,
-    ValueNotifier<int> indexNotifier,
+    ValueNotifier<int> weeksPerPageNotifier,
     ValueChanged<int> notifyChanging,
   ) {
-    if (style.availableWeeksPerPage.length == 1) return null;
+    if (style.formatAvailables.length == 1) return null;
     return _builderFromList(
       style: style,
       styleTextButton: this,
-      indexNotifier: indexNotifier,
+      weeksPerPageNotifier: weeksPerPageNotifier,
       notifyChanging: notifyChanging,
     );
   }

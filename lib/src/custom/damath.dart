@@ -1,4 +1,3 @@
-
 import 'package:damath/damath.dart';
 
 ///
@@ -30,7 +29,9 @@ extension DTExt on DateTime {
   /// [dateOnly], [timeOnly], [plus]
   ///
   DateTime get dateOnly => DateTime(year, month, day);
-  Duration get timeOnly => Duration(hours: hour, minutes: minute, seconds: second);
+
+  Duration get timeOnly =>
+      Duration(hours: hour, minutes: minute, seconds: second);
 
   DateTime plus({
     int year = 0,
@@ -125,18 +126,18 @@ extension DTExt on DateTime {
   DateTime dateAddDays(int n) => DateTime(year, month, day + n);
 
   ///
-  /// [dates], [datesFromNow]
-  /// [datesReversed], [datesFromNowReversed]
+  /// [dates], [datesFromNowTo]
+  /// [datesFrom], [datesToNowFrom]
   ///
   List<DateTime> dates(int length, [int from = 0]) =>
       List.generate(length, (i) => DateTime(year, month, day + from + i));
 
-  List<DateTime> datesFromNow(int length) =>
+  List<DateTime> datesFromNowTo(int length) =>
       List.generate(length, (i) => DateTime(year, month, day + i));
 
-  List<DateTime> datesReversed(int length, [int from = 0]) =>
-      List.generate(length, (i) => DateTime(year, month, day + from - i));
+  List<DateTime> datesFrom(int length, [int begin = 0]) =>
+      List.generate(length, (i) => DateTime(year, month, day + begin - i));
 
-  List<DateTime> datesFromNowReversed(int length) =>
+  List<DateTime> datesToNowFrom(int length) =>
       List.generate(length, (i) => DateTime(year, month, day - i));
 }

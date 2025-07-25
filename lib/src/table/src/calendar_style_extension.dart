@@ -17,7 +17,7 @@ part of '../table_calendar.dart';
 enum CalendarCellType {
   disabled,
   today,
-  selected,
+  focused,
   weekend,
   weekday,
   holiday,
@@ -28,11 +28,11 @@ enum CalendarCellType {
 ///
 ///
 class CalendarStyleHeader {
-  final void Function(DateTime focusedDay)? headerOnTap;
-  final void Function(DateTime focusedDay)? headerOnLongPress;
-  final EdgeInsets headerPadding;
-  final EdgeInsets headerMargin;
-  final BoxDecoration headerDecoration;
+  final void Function(DateTime focusedDay)? onTap;
+  final void Function(DateTime focusedDay)? onLongPress;
+  final EdgeInsets padding;
+  final EdgeInsets margin;
+  final BoxDecoration decoration;
 
   ///
   ///
@@ -49,11 +49,11 @@ class CalendarStyleHeader {
   final StyleChevrons? styleChevrons;
 
   const CalendarStyleHeader({
-    this.headerOnTap,
-    this.headerOnLongPress,
-    this.headerDecoration = const BoxDecoration(),
-    this.headerMargin = EdgeInsets.zero,
-    this.headerPadding = const EdgeInsets.symmetric(vertical: 8.0),
+    this.onTap,
+    this.onLongPress,
+    this.decoration = const BoxDecoration(),
+    this.margin = EdgeInsets.zero,
+    this.padding = const EdgeInsets.symmetric(vertical: 8.0),
     this.titleCentered = false,
     this.titleTextFormatter,
     this.titleTextStyle = const TextStyle(fontSize: 17.0),
@@ -71,8 +71,8 @@ class CalendarStyleHeader {
   static DateLocaleBuilder _builderTitle(CalendarStyleHeader style) =>
       (focusedDate, locale) => Expanded(
         child: GestureDetector(
-          onTap: () => style.headerOnTap?.call(focusedDate),
-          onLongPress: () => style.headerOnLongPress?.call(focusedDate),
+          onTap: () => style.onTap?.call(focusedDate),
+          onLongPress: () => style.onLongPress?.call(focusedDate),
           child: Text(
             style.titleTextFormatter?.call(focusedDate, locale) ??
                 DateFormat.yMMMM(locale).format(focusedDate),
@@ -83,6 +83,13 @@ class CalendarStyleHeader {
       );
 
   DateLocaleBuilder get buildTitle => _bTitle ?? _builderTitle(this);
+
+
+  // TODO: know the default fontSize if textStyle == null
+  double get height =>
+      margin.vertical +
+          padding.vertical +
+          titleTextStyle.fontSize!;
 }
 
 ///
@@ -99,8 +106,8 @@ class CalendarStyleWeekNumber {
     this.textStyle = const TextStyle(fontSize: 12, color: Color(0xFFBFBFBF)),
   });
 
-  DateHeightBuilder builderFrom(Predicator<DateTime> predicateBlock) =>
-      (startingDate, heightRow) =>
+  DateBuilder builderFrom(Predicator<DateTime> predicateBlock, double heightRow) =>
+      (startingDate) =>
           !predicateBlock(startingDate) ||
                   !predicateBlock(
                     startingDate.add(
@@ -134,12 +141,12 @@ class CalendarStyleWeekNumber {
 ///
 ///
 class CalendarStyleDayOfWeek {
-  final double height;
+  final double? height;
   final DateTimeFormatter textFormatter;
   final Decoration decoration;
   final TextStyle weekdayStyle;
   final TextStyle weekendStyle;
-  final CellConstraintsBuilder? _b;
+  final DateLocaleBuilder? _b;
 
   const CalendarStyleDayOfWeek({
     this.height = 16.0,
@@ -147,18 +154,18 @@ class CalendarStyleDayOfWeek {
     this.decoration = const BoxDecoration(),
     this.weekdayStyle = const TextStyle(color: Color(0xFF4F4F4F)),
     this.weekendStyle = const TextStyle(color: Color(0xFF6A6A6A)),
-    CellConstraintsBuilder? builderDayOfWeek,
+    DateLocaleBuilder? builderDayOfWeek,
   }) : _b = builderDayOfWeek;
 
   // Defaults to simple `'E'` format (i.e. Mon, Tue, Wed, etc.).
   static String _formatter(DateTime date, dynamic locale) =>
       DateFormat.E(locale).format(date);
 
-  static CellConstraintsBuilder _builder(
+  static DateLocaleBuilder _builder(
     Predicator<DateTime> predicateWeekend,
     CalendarStyleDayOfWeek styleDayOfWeek,
   ) =>
-      (date, _, locale, __) => Center(
+      (date, locale) => Center(
         child: ExcludeSemantics(
           child: Text(
             styleDayOfWeek.textFormatter(date, locale),
@@ -172,9 +179,7 @@ class CalendarStyleDayOfWeek {
 
   TableRow Function(List<DateTime> dates) buildFrom({
     required Predicator<DateTime> predicateWeekend,
-    required DateTime focusedDate,
     required dynamic locale,
-    required BoxConstraints constraints,
     required Widget? weekNumberTitle,
   }) {
     final builder = _b ?? _builder(predicateWeekend, this);
@@ -184,7 +189,7 @@ class CalendarStyleDayOfWeek {
       DateTime.daysPerWeek,
       (index) => SizedBox(
         height: height,
-        child: builder(dates[index], focusedDate, locale, constraints),
+        child: builder(dates[index], locale),
       ),
     );
     final row =
@@ -285,20 +290,20 @@ class CalendarStyleCellMark {
     };
   }
 
-  ConstraintsDateCellTypeBuilder? builderFrom<T>({
+  CellMetaBuilder? builderFrom<T>({
     required EventLoader<T>? eventLoader,
-    required EventsLayoutMark<T>? layoutAll,
-    required EventElementMark<T>? layoutElement,
+    required EventsLayoutMark<T>? eventsLayoutMark,
+    required EventElementMark<T>? eventLayoutSingleMark,
     required MarkConfiguration<T>? customMark,
   }) {
     if (eventLoader == null) return null;
     if (customMark == null) {
-      final layout = (layoutAll ?? _allPositionedRow<T>)(this);
-      final mark = (layoutElement ?? _singleDecoration<T>)(this);
-      return (constraints, date, cellType) =>
+      final layout = (eventsLayoutMark ?? _allPositionedRow<T>)(this);
+      final mark = (eventLayoutSingleMark ?? _singleDecoration<T>)(this);
+      return (date, focusedDate, cellType, constraints) =>
           layout(constraints, date, eventLoader(date), mark)!;
     } else {
-      return (constraints, date, cellType) {
+      return (date, focusedDate, cellType, constraints) {
         final builder = customMark[cellType];
         if (builder == null) return null;
         final layout = (builder.$1 ?? _allPositionedRow<T>)(this);
@@ -313,12 +318,12 @@ class CalendarStyleCellMark {
 ///
 ///
 class CalendarStyleCellRange {
-  final CellConstraintsBuilder? _bStart;
-  final CellConstraintsBuilder? _bWithin;
-  final CellConstraintsBuilder? _bEnd;
+  final CellMetaBuilder? _bStart;
+  final CellMetaBuilder? _bWithin;
+  final CellMetaBuilder? _bEnd;
   final ConstraintsRangeBuilder? _bHighlight;
   final HighlightWidthFrom<CalendarStyle> widthFrom;
-  final Map<CalendarCellType, (RangeState3, CellConstraintsBuilder?)>?
+  final Map<CalendarCellType, (RangeState3, CellMetaBuilder?)>?
   customBuilder;
 
   ///
@@ -361,9 +366,9 @@ class CalendarStyleCellRange {
     ///
     ///
     ///
-    CellConstraintsBuilder? builderRangeStart,
-    CellConstraintsBuilder? builderRangeIn,
-    CellConstraintsBuilder? builderRangeEnd,
+    CellMetaBuilder? builderRangeStart,
+    CellMetaBuilder? builderRangeIn,
+    CellMetaBuilder? builderRangeEnd,
     ConstraintsRangeBuilder? builderRangeHighlight,
     this.widthFrom = _widthFrom,
     this.customBuilder,
@@ -379,41 +384,41 @@ class CalendarStyleCellRange {
   ///
   ///
   ///
-  static CellConstraintsBuilder _builderRangeWithin(
-    CalendarStyle style,
-    CalendarStyleCellRange styleRange,
-  ) =>
-      (date, _, locale, __) => CalendarStyle._buildContainer(
-        date: date,
-        style: style,
-        locale: locale,
-        decoration: styleRange.rangeWithinDecoration,
-        textStyle: styleRange.rangeWithinTextStyle,
-      );
-
-  static CellConstraintsBuilder _builderRangeEnd(
-    CalendarStyle style,
-    CalendarStyleCellRange styleRange,
-  ) =>
-      (date, _, locale, __) => CalendarStyle._buildContainer(
-        date: date,
-        style: style,
-        locale: locale,
-        decoration: styleRange.rangeEndDecoration,
-        textStyle: styleRange.rangeEndTextStyle,
-      );
-
-  static CellConstraintsBuilder _builderRangeStart(
-    CalendarStyle style,
-    CalendarStyleCellRange styleRange,
-  ) =>
-      (date, _, locale, __) => CalendarStyle._buildContainer(
-        date: date,
-        style: style,
-        locale: locale,
-        decoration: styleRange.rangeStartDecoration,
-        textStyle: styleRange.rangeStartTextStyle,
-      );
+  // static CellConstraintsBuilder _builderRangeWithin(
+  //   CalendarStyle style,
+  //   CalendarStyleCellRange styleRange,
+  // ) =>
+  //     (date, _, locale, __) => CalendarStyle._buildContainer(
+  //       date: date,
+  //       style: style,
+  //       locale: locale,
+  //       decoration: styleRange.rangeWithinDecoration,
+  //       textStyle: styleRange.rangeWithinTextStyle,
+  //     );
+  //
+  // static CellConstraintsBuilder _builderRangeEnd(
+  //   CalendarStyle style,
+  //   CalendarStyleCellRange styleRange,
+  // ) =>
+  //     (date, _, locale, __) => CalendarStyle._buildContainer(
+  //       date: date,
+  //       style: style,
+  //       locale: locale,
+  //       decoration: styleRange.rangeEndDecoration,
+  //       textStyle: styleRange.rangeEndTextStyle,
+  //     );
+  //
+  // static CellConstraintsBuilder _builderRangeStart(
+  //   CalendarStyle style,
+  //   CalendarStyleCellRange styleRange,
+  // ) =>
+  //     (date, _, locale, __) => CalendarStyle._buildContainer(
+  //       date: date,
+  //       style: style,
+  //       locale: locale,
+  //       decoration: styleRange.rangeStartDecoration,
+  //       textStyle: styleRange.rangeStartTextStyle,
+  //     );
 
   ///
   ///
@@ -444,7 +449,7 @@ class CalendarStyleCellRange {
   /// 3. rangeStart != null, rangeEnd != null -> expand range, shrink range, unselect rangeEnd
   ///
   ///
-  ConstraintsDateBuilder? builderFrom({
+  CellMetaBuilder? builderFrom({
     required CalendarStyle style,
     required bool isBackground,
   }) {

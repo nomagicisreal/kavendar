@@ -2,6 +2,8 @@
 part of '../table_calendar.dart';
 
 /// TODO: clean [Calendar], [CalendarStyle], define [CalendarFormat] integrating calendar scopes, weeksPerPage, other 'how to page' functions
+/// TODO: think if there is a format using ValueListenableBuilder for each cell.
+///
 
 ///
 ///
