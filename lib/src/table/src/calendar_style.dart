@@ -3,10 +3,9 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [OnDateSelected], ...
+/// [OnDateChanged], ...
 /// [PredicateCell], ...
 /// [EventSingleBuilder], ...
-/// [RangeSelectionMode], ...
 ///
 /// [CalendarStyle]
 ///
@@ -15,10 +14,10 @@ part of '../table_calendar.dart';
 ///
 ///
 ///
-typedef OnPageChanged = void Function(int index, DateTime focusedDate);
+typedef OnPageChanged =
+    void Function(int index, int indexPrevious, DateTime focusedDate);
 
-typedef OnDateSelected =
-    void Function(DateTime selectedDate, DateTime focusedDate);
+typedef OnDateChanged = void Function(DateTime date, DateTime datePrevious);
 
 typedef OnRangeSelected =
     void Function(DateTime? start, DateTime? end, DateTime focusedDate);
@@ -26,7 +25,9 @@ typedef OnRangeSelected =
 ///
 ///
 ///
-typedef DateBuilder = Widget? Function(DateTime date);
+typedef DateBuilder = Widget Function(DateTime date);
+typedef DateFocusedBuilder =
+    Widget? Function(DateTime date, DateTime focusedDate);
 typedef DateLocaleBuilder = Widget Function(DateTime date, dynamic locale);
 typedef CellMetaBuilder =
     Widget? Function(
@@ -45,8 +46,8 @@ typedef CellPlan =
       Widget child,
     );
 
-typedef CalendarRowsGenerator =
-    List<TableRow> Function(List<DateTime> dates, DateBuilder buildCell);
+typedef TableRowsBuilder =
+    Widget Function(List<DateTime> dates, DateBuilder buildCell);
 
 ///
 ///
@@ -96,24 +97,23 @@ typedef MarkConfiguration<T> =
 ///
 class CalendarStyle {
   final DateTimeFormatter dateTextFormatter;
-  final DateTimeRange? _domain;
-  final int startingWeekday;
-  final bool verticalScrollAble;
   final int verticalFlex;
+  final FlexFit verticalFlexFit;
   final ScrollPhysics? horizontalScroll;
 
   ///
   ///
   ///
   // final CalendarFormatPage format;
+  final DateTimeRange? formatDomain;
+  final int formatStartingWeekday;
   final List<int> formatAvailables;
   final ValueChanged<int>? formatOnChanged;
   final Duration formatAnimationDuration;
   final Curve formatAnimationCurve;
-  final Duration pageStepDuration;
-  final Curve pageStepCurve;
-  final bool pageJumpingEnabled;
-  final bool pageAnimationEnabled;
+  final Duration pagingDuration;
+  final Curve pagingCurve;
+  final CalendarPagingToWhere? formatPagingToWhere;
 
   ///
   ///
@@ -127,7 +127,7 @@ class CalendarStyle {
   ///
   ///
   ///
-  final List<MapEntry<CalendarCellType, DecorationTextStyle>> cellSetup;
+  final List<(CalendarCellType, DecorationTextStyle)> cellSetup;
   final HitTestBehavior cellHitTestBehavior;
   final EdgeInsets cellMargin;
   final EdgeInsets cellPadding;
@@ -147,35 +147,30 @@ class CalendarStyle {
   final Predicator<DateTime> predicateHoliday;
   final Predicator<DateTime> predicateWeekend;
   final Predicator<DateTime> predicateWeekday;
-  final OnRangeSelected? onRangeSelected;
-  final OnDateSelected? onDaySelected;
-  final OnDateSelected? onDateLongPressed;
+  final OnDateChanged? onDateFocused;
+  final OnDateChanged? onDateLongPressed;
   final OnPageChanged? onPageChanged;
-  final void Function(PageController pageController)? onCalendarCreated;
+  final void Function(PageController pageController)? onCalendarInited;
 
   const CalendarStyle({
     this.dateTextFormatter = _dateTextFormater,
-    DateTimeRange? domain,
+    this.verticalFlex = 1, // 1 expand, 0 shrink
+    this.verticalFlexFit = FlexFit.loose,
+    this.horizontalScroll = const PageScrollPhysics(),
 
     ///
     ///
     ///
     // this.format = CalendarFormatPage.month,
+    this.formatDomain,
     this.formatAvailables = weeksPerPage_all,
-    this.startingWeekday = DateTime.sunday,
+    this.formatStartingWeekday = DateTime.sunday,
     this.formatOnChanged,
-    this.pageStepDuration = DurationExtension.milli300,
-    this.pageStepCurve = Curves.easeOut,
-    this.horizontalScroll = const PageScrollPhysics(),
-    this.verticalScrollAble = true,
-    this.verticalFlex = 1, // 1 expand, 0 shrink
-    ///
-    ///
-    ///
-    this.pageJumpingEnabled = true,
-    this.pageAnimationEnabled = true,
+    this.formatPagingToWhere,
     this.formatAnimationDuration = DurationExtension.milli200,
     this.formatAnimationCurve = Curves.linear,
+    this.pagingDuration = DurationExtension.milli300,
+    this.pagingCurve = Curves.easeOut,
 
     ///
     ///
@@ -205,42 +200,42 @@ class CalendarStyle {
     /// TODO: enable range decoration, text style
     ///
     this.cellSetup = const [
-      MapEntry(
+      (
         CalendarCellType.disabled,
         DecorationTextStyle(
           BoxDecoration(shape: BoxShape.circle),
           TextStyle(color: Color(0xFFDFDFDF)),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.focused,
         DecorationTextStyle(
           BoxDecoration(color: Color(0xFF5C6BC0), shape: BoxShape.circle),
           TextStyle(color: Color(0xFFFAFAFA), fontSize: 16.0),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.today,
         DecorationTextStyle(
           BoxDecoration(color: Color(0xFF9FA8DA), shape: BoxShape.circle),
           TextStyle(color: Color(0xFFFAFAFA), fontSize: 16.0),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.outside,
         DecorationTextStyle(
           BoxDecoration(shape: BoxShape.circle),
           TextStyle(color: Color(0xFFAEAEAE)),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.weekend,
         DecorationTextStyle(
           BoxDecoration(shape: BoxShape.circle),
           TextStyle(color: Color(0xFF5A5A5A)),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.holiday,
         DecorationTextStyle(
           BoxDecoration(
@@ -252,7 +247,7 @@ class CalendarStyle {
           TextStyle(color: Color(0xFF5C6BC0)),
         ),
       ),
-      MapEntry(
+      (
         CalendarCellType.weekday,
         DecorationTextStyle(BoxDecoration(shape: BoxShape.circle), TextStyle()),
       ),
@@ -261,17 +256,15 @@ class CalendarStyle {
     ///
     ///
     ///
-    this.predicateDisable = _datePredicateFalse,
-    this.predicateHoliday = _datePredicateFalse,
-    this.predicateWeekend = _datePredicateWeekend,
-    this.predicateWeekday = _datePredicateWeekday,
-    this.onRangeSelected,
-    this.onDaySelected,
+    this.predicateDisable = DTExt.predicateFalse,
+    this.predicateHoliday = DTExt.predicateFalse,
+    this.predicateWeekend = DTExt.predicateWeekend,
+    this.predicateWeekday = DTExt.predicateWeekday,
+    this.onDateFocused,
     this.onDateLongPressed,
     this.onPageChanged,
-    this.onCalendarCreated,
-  }) : _domain = domain,
-       _tableColumnWidth = tableColumnWidth;
+    this.onCalendarInited,
+  }) : _tableColumnWidth = tableColumnWidth;
 
   ///
   ///
@@ -291,27 +284,12 @@ class CalendarStyle {
   static String _dateTextFormater(DateTime date, dynamic locale) =>
       '${date.day}';
 
-  static bool _datePredicateFalse(DateTime date) => false;
-
-  static bool _datePredicateWeekend(DateTime date) {
-    final day = date.weekday;
-    return day == DateTime.sunday || day == DateTime.saturday;
-  }
-
-  static bool _datePredicateWeekday(DateTime date) {
-    final day = date.weekday;
-    return day == DateTime.monday ||
-        day == DateTime.tuesday ||
-        day == DateTime.wednesday ||
-        day == DateTime.thursday ||
-        day == DateTime.friday;
-  }
-
   ///
-  ///
+  /// [domain]
+  /// [tableColumnWidth]
   ///
   DateTimeRange domain([DateTime? focusedDate]) {
-    final domain = _domain;
+    final domain = formatDomain;
     if (domain != null) return domain;
     return DTRExt.scopeMonthsFrom(
       (focusedDate ?? DateTime.now()).dateOnly,
@@ -320,94 +298,138 @@ class CalendarStyle {
     );
   }
 
+  Map<int, TableColumnWidth>? get tableColumnWidth =>
+      _tableColumnWidth ??
+      (styleWeekNumber == null
+          ? null
+          : {0: FixedColumnWidth(styleWeekNumber!.flexOnRow)});
+
   ///
-  /// todo: instead of maybe unused function creating a property (with stack | without stack)
+  /// [_heightBody]
+  /// [_pageNextFocus]
+  /// [_pageFirstDateFrom]
   ///
-  Widget _cellStack(List<Widget> children) => Stack(
+  double _heightBody(BoxConstraints constraints) =>
+      constraints.maxHeight -
+      tablePadding.vertical -
+      (styleDayOfWeek?.height ?? 0) -
+      (styleHeader?.height ?? 0);
+
+  DateTime? _pageNextFocus(int weeksPerPage, int index, int indexPrevious) {
+    if (weeksPerPage == CalendarStyle.weeksPerPage_6) {
+      return switch (formatPagingToWhere) {
+        null => null,
+        CalendarPagingToWhere.correspondingDay => throw UnimplementedError(),
+        CalendarPagingToWhere.correspondingWeekAndDay =>
+          throw UnimplementedError(),
+        CalendarPagingToWhere.firstDateOfMonth => throw UnimplementedError(),
+        CalendarPagingToWhere.firstDateOfFirstWeek =>
+          throw UnimplementedError(),
+        CalendarPagingToWhere.lastDateOfMonth => throw UnimplementedError(),
+        CalendarPagingToWhere.lastDateOfLastWeek => throw UnimplementedError(),
+      };
+    } else {
+      throw UnimplementedError();
+    }
+  }
+
+  IndexingDate _pageFirstDateFrom(
+    DateTime domainStart,
+    DateTime domainEnd,
+    int weeksPerPage,
+  ) => switch (weeksPerPage) {
+    weeksPerPage_6 => DTExt.daysToDateClampFrom(
+      domainStart,
+      domainEnd,
+      startingWeekday: formatStartingWeekday,
+      times: DateTime.daysPerWeek * weeksPerPage,
+    ),
+    _ => throw UnimplementedError(),
+  };
+
+  ///
+  /// [_buildCell]
+  /// [_buildStack]
+  /// [buildTableWeekDates]
+  /// [_buildTableRow], [_buildTable]
+  /// [_buildBodyPage], [_buildBody]
+  ///
+  Widget _buildCell(DateTime date, dynamic locale, DecorationTextStyle style) =>
+      Semantics(
+        key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
+        label:
+            '${DateFormat.EEEE(locale).format(date)}, '
+            '${DateFormat.yMMMMd(locale).format(date)}',
+        excludeSemantics: true,
+        child: AnimatedContainer(
+          duration: cellAnimationDuration,
+          margin: cellMargin,
+          padding: cellPadding,
+          decoration: style.decoration,
+          alignment: cellAlignment,
+          child: Text(dateTextFormatter(date, locale), style: style.textStyle),
+        ),
+      );
+
+  // todo: instead of being a maybe unused function, create a property (with stack | without stack)
+  Widget _buildStack(List<Widget> children) => Stack(
     alignment: cellStackAlignment,
     clipBehavior: cellStackClip,
     children: children,
   );
 
-  CellPlan _cellPlanFrom<T>({
-    required DateTime focusedDate,
-    required dynamic locale,
-    required EventLoader<T>? eventLoader,
-    required EventsLayoutMark<T>? eventsLayoutMark,
-    required EventElementMark<T>? eventLayoutSingleMark,
-    required MarkConfiguration<T>? customMark,
-  }) {
-    final buildBackground = styleCellRangeHighlight?.builderFrom(
-      style: this,
-      isBackground: true,
-    );
-    final buildOverlay = styleCellMark?.builderFrom(
-      eventLoader: eventLoader,
-      eventsLayoutMark: eventsLayoutMark,
-      eventLayoutSingleMark: eventLayoutSingleMark,
-      customMark: customMark,
-    );
-
-    return buildBackground == null
-        ? (buildOverlay == null
-            ? (_, __, ___, ____, child) => child
-            : (date, focusedDate, cellType, constraints, child) {
-              final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _cellStack([child, if (overlay != null) overlay]);
-            })
-        : (buildOverlay == null
-            ? (date, focusedDate, cellType, constraints, child) {
-              final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _cellStack([if (background != null) background, child]);
-            }
-            : (date, focusedDate, cellType, constraints, child) {
-              final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _cellStack([
-                if (background != null) background,
-                child,
-                if (overlay != null) overlay,
-              ]);
-            });
-  }
-
-  ///
-  ///
-  ///
-  static List<Widget> _rowGenerateFrom(
+  static List<Widget> buildTableWeekDates(
     List<DateTime> dates,
-    double? height,
     int iRow,
     DateBuilder buildCell,
   ) => List.generate(
     DateTime.daysPerWeek,
-    (iCol) => SizedBox(
-      height: height,
-      child: buildCell(dates[DateTime.daysPerWeek * iRow + iCol]),
+    (iCol) => buildCell(dates[DateTime.daysPerWeek * iRow + iCol]),
+  );
+
+  TableRow _buildTableRow(List<Widget> children) =>
+      TableRow(decoration: tableRowDecoration, children: children);
+
+  Widget _buildTable(List<TableRow> rows) => Padding(
+    padding: tablePadding,
+    child: Table(
+      border: tableBorder,
+      columnWidths: tableColumnWidth,
+      children: rows,
     ),
   );
 
-  CalendarRowsGenerator _rowGeneratorFrom(
+  Widget _buildBodyPage(BuildContext context, double value, Widget? child) =>
+      AnimatedSize(
+        duration: formatAnimationDuration,
+        curve: formatAnimationCurve,
+        alignment: Alignment.topCenter,
+        child: SizedBox(height: value, child: child),
+      );
+
+  Widget _buildBody(ConstraintsBuilder layout) => Flexible(
+    flex: verticalFlex,
+    fit: verticalFlexFit,
+    child: LayoutBuilder(builder: layout),
+  );
+
+  ///
+  /// [_initColumnBuilder]
+  /// [_initTableBuilder]
+  /// [_initCellBuilder]
+  ///
+  DateBuilder _initColumnBuilder({
+    required DateBuilder? headerBuilder,
+    required ConstraintsBuilder bodyLayout,
+  }) =>
+      headerBuilder == null
+          ? (_) => _buildBody(bodyLayout)
+          : (date) => Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [headerBuilder(date), _buildBody(bodyLayout)],
+          );
+
+  TableRowsBuilder _initTableBuilder(
     dynamic locale,
     double heightRow,
     Predicator<DateTime> predicateBlock,
@@ -417,14 +439,11 @@ class CalendarStyle {
     final rowBody =
         firstColumn == null
             ? (dates, iRow, buildCell) =>
-                _rowGenerateFrom(dates, heightRow, iRow, buildCell)
-            : (dates, iRow, buildCell) {
-              final first = firstColumn(dates[DateTime.daysPerWeek * iRow]);
-              return [
-                if (first != null) first,
-                ..._rowGenerateFrom(dates, heightRow, iRow, buildCell),
-              ];
-            };
+                buildTableWeekDates(dates, iRow, buildCell)
+            : (dates, iRow, buildCell) => [
+              firstColumn(dates[DateTime.daysPerWeek * iRow]),
+              ...buildTableWeekDates(dates, iRow, buildCell),
+            ];
 
     final styleDayOfWeek = this.styleDayOfWeek;
     final rowHead = styleDayOfWeek?.buildFrom(
@@ -433,117 +452,137 @@ class CalendarStyle {
       weekNumberTitle: styleWeekNumber?.buildTitle(styleDayOfWeek.height),
     );
     return rowHead == null
-        ? (dates, buildCell) => List.generate(
-          dates.length ~/ DateTime.daysPerWeek,
-          (iRow) => _tableRow(rowBody(dates, iRow, buildCell)),
+        ? (dates, buildCell) => _buildTable(
+          List.generate(
+            dates.length ~/ DateTime.daysPerWeek,
+            (iRow) => _buildTableRow(rowBody(dates, iRow, buildCell)),
+          ),
         )
-        : (dates, buildCell) => [
+        : (dates, buildCell) => _buildTable([
           rowHead(dates),
           ...List.generate(
             dates.length ~/ DateTime.daysPerWeek,
-            (iRow) => _tableRow(rowBody(dates, iRow, buildCell)),
+            (iRow) => _buildTableRow(rowBody(dates, iRow, buildCell)),
           ),
-        ];
+        ]);
   }
 
-  ///
-  ///
-  ///
-  DateBuilder _dateBuilderFrom({
+  DateBuilder _initCellBuilder<T>({
+    required dynamic locale,
     required CalendarCellConfiguration configuration,
     required ValueChanged<DateTime> onTap,
-    required ValueChanged<DateTime> onLongPress,
-    required Predicator<DateTime> predicateBlock,
-    required DateTime focusedDate,
-    required dynamic locale,
-    required CellPlan plan,
-  }) => (date) {
-    if (predicateBlock(date)) return null;
-    for (var current in cellSetup) {
-      final cellType = current.key;
-      final predicate = configuration[cellType]!;
-      if (!predicate(date)) continue;
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final child = plan(
-            date,
-            focusedDate,
-            cellType,
-            constraints,
-            _tableRowCell(date, locale, current.value),
-          );
-          return cellType == CalendarCellType.disabled
-              ? child
-              : GestureDetector(
-                behavior: cellHitTestBehavior,
-                onTap: () => onTap(date),
-                onLongPress: () => onLongPress(date),
-                child: child,
-              );
-        },
-      );
-    }
-    throw StateError('unknown builder for date($date)');
-  };
-
-  ///
-  /// [_tableRowCell]
-  /// [_tableRow]
-  /// [_table]
-  ///
-  Widget _tableRowCell(
-    DateTime date,
-    dynamic locale,
-    DecorationTextStyle style,
-  ) => Semantics(
-    key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
-    label:
-        '${DateFormat.EEEE(locale).format(date)}, '
-        '${DateFormat.yMMMMd(locale).format(date)}',
-    excludeSemantics: true,
-    child: AnimatedContainer(
-      duration: cellAnimationDuration,
-      margin: cellMargin,
-      padding: cellPadding,
-      decoration: style.decoration,
-      alignment: cellAlignment,
-      child: Text(dateTextFormatter(date, locale), style: style.textStyle),
-    ),
-  );
-
-  TableRow _tableRow(List<Widget> children) =>
-      TableRow(decoration: tableRowDecoration, children: children);
-
-  Widget _table(List<TableRow> rows) {
-    final styleWeekNumber = this.styleWeekNumber;
-    return Padding(
-      padding: tablePadding,
-      child: Table(
-        border: tableBorder,
-        columnWidths:
-            _tableColumnWidth ??
-            (styleWeekNumber == null
-                ? null
-                : {0: FlexColumnWidth(styleWeekNumber.flexOnRow)}),
-        children: rows,
-      ),
+    required Predicator<DateTime> predicateBlocked,
+    required double Function() getHeight,
+    required DateTime Function() getFocusedDate,
+    // required int Function() getFocusedState,
+    required EventLoader<T>? eventLoader,
+    required EventsLayoutMark<T>? eventsLayoutMark,
+    required EventElementMark<T>? eventLayoutSingleMark,
+    required MarkConfiguration<T>? eventMarkConfiguration,
+  }) {
+    ///
+    ///
+    ///
+    final buildBackground = styleCellRangeHighlight?.builderFrom(
+      style: this,
+      isBackground: true,
     );
+    final buildOverlay = styleCellMark?.builderFrom(
+      eventLoader: eventLoader,
+      eventsLayoutMark: eventsLayoutMark,
+      eventLayoutSingleMark: eventLayoutSingleMark,
+      customMark: eventMarkConfiguration,
+    );
+    final plan =
+        buildBackground == null
+            ? (buildOverlay == null
+                ? (_, __, ___, ____, child) => child
+                : (date, focusedDate, cellType, constraints, child) {
+                  final overlay = buildOverlay(
+                    date,
+                    focusedDate,
+                    cellType,
+                    constraints,
+                  );
+                  return _buildStack([child, if (overlay != null) overlay]);
+                })
+            : (buildOverlay == null
+                ? (date, focusedDate, cellType, constraints, child) {
+                  final background = buildBackground(
+                    date,
+                    focusedDate,
+                    cellType,
+                    constraints,
+                  );
+                  return _buildStack([
+                    if (background != null) background,
+                    child,
+                  ]);
+                }
+                : (date, focusedDate, cellType, constraints, child) {
+                  final overlay = buildOverlay(
+                    date,
+                    focusedDate,
+                    cellType,
+                    constraints,
+                  );
+                  final background = buildBackground(
+                    date,
+                    focusedDate,
+                    cellType,
+                    constraints,
+                  );
+                  return _buildStack([
+                    if (background != null) background,
+                    child,
+                    if (overlay != null) overlay,
+                  ]);
+                });
+
+    ///
+    /// TODO: prevent ternary closure from every build
+    ///
+    final onDateLongPressed = this.onDateLongPressed;
+    final VoidCallback? Function(DateTime, DateTime) onLongPress =
+        onDateLongPressed == null
+            ? (date, focusedDate) => null
+            : (date, focusedDate) => () => onDateLongPressed(date, focusedDate);
+
+    return (date) {
+      Widget? child;
+      if (predicateBlocked(date)) {
+        child = null;
+      } else {
+        for (var current in cellSetup) {
+          final cellType = current.$1;
+          final predicate = configuration[cellType]!;
+          if (!predicate(date)) continue;
+          child = LayoutBuilder(
+            builder: (context, constraints) {
+              final child = plan(
+                date,
+                getFocusedDate(),
+                cellType,
+                constraints,
+                _buildCell(date, locale, current.$2),
+              );
+              return cellType == CalendarCellType.disabled
+                  ? child
+                  : GestureDetector(
+                    behavior: cellHitTestBehavior,
+                    onTap: () => onTap(date),
+                    onLongPress: onLongPress(date, getFocusedDate()),
+                    child: child,
+                  );
+            },
+          );
+          break;
+        }
+        if (child == null) {
+          throw StateError('unknown builder for date($date)');
+        }
+      }
+      return SizedBox(height: getHeight(), child: child);
+    };
   }
-
-  ///
-  /// [_pageBuilder]
-  /// [pageHeightWithoutBody]
-  ///
-  Widget _pageBuilder(BuildContext context, double value, Widget? child) =>
-      AnimatedSize(
-        duration: formatAnimationDuration,
-        curve: formatAnimationCurve,
-        alignment: Alignment.topCenter,
-        child: SizedBox(height: value, child: child),
-      );
-
-  double get pageHeightWithoutBody =>
-      tablePadding.vertical +
-      (styleDayOfWeek?.height ?? 0) +
-      (styleHeader?.height ?? 0);
 }

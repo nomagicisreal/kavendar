@@ -84,16 +84,55 @@ class CalendarStyleHeader {
 
   DateLocaleBuilder get buildTitle => _bTitle ?? _builderTitle(this);
 
-
   // TODO: know the default fontSize if textStyle == null
   double get height =>
-      margin.vertical +
-          padding.vertical +
-          titleTextStyle.fontSize!;
+      margin.vertical + padding.vertical + titleTextStyle.fontSize!;
+
+  ///
+  /// TODO: enable format button
+  ///
+  DateBuilder initBuilder({
+    required PageController pageController,
+    required CalendarStyle style,
+    required dynamic locale,
+    required ValueNotifier<int> weeksPerPage,
+    required ValueChanged<int> updateFormatIndex,
+  }) {
+    final buildFormatButton = styleFormatButton?.builderFrom(
+      style,
+      updateFormatIndex,
+    );
+    final buildChevron = styleChevrons?.builder;
+    return (focusedDate) => Container(
+      decoration: decoration,
+      margin: margin,
+      padding: padding,
+      child: Row(
+        children: [
+          if (buildChevron != null)
+            buildChevron(
+              DirectionIn4.left,
+              iconOnTap: pageController.previousPage,
+              duration: style.pagingDuration,
+              curve: style.pagingCurve,
+            ),
+          buildTitle(focusedDate, locale),
+          if (buildFormatButton != null) buildFormatButton(weeksPerPage),
+          if (buildChevron != null)
+            buildChevron(
+              DirectionIn4.right,
+              iconOnTap: pageController.nextPage,
+              duration: style.pagingDuration,
+              curve: style.pagingCurve,
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 ///
-///
+/// TODO: has weekNumber -> vertical drag to switch page
 ///
 class CalendarStyleWeekNumber {
   final String title;
@@ -106,7 +145,10 @@ class CalendarStyleWeekNumber {
     this.textStyle = const TextStyle(fontSize: 12, color: Color(0xFFBFBFBF)),
   });
 
-  DateBuilder builderFrom(Predicator<DateTime> predicateBlock, double heightRow) =>
+  DateBuilder builderFrom(
+    Predicator<DateTime> predicateBlock,
+    double heightRow,
+  ) =>
       (startingDate) =>
           !predicateBlock(startingDate) ||
                   !predicateBlock(
@@ -187,10 +229,7 @@ class CalendarStyleDayOfWeek {
 
     List<Widget> children(List<DateTime> dates) => List.generate(
       DateTime.daysPerWeek,
-      (index) => SizedBox(
-        height: height,
-        child: builder(dates[index], locale),
-      ),
+      (index) => SizedBox(height: height, child: builder(dates[index], locale)),
     );
     final row =
         weekNumberTitle == null
@@ -323,8 +362,8 @@ class CalendarStyleCellRange {
   final CellMetaBuilder? _bEnd;
   final ConstraintsRangeBuilder? _bHighlight;
   final HighlightWidthFrom<CalendarStyle> widthFrom;
-  final Map<CalendarCellType, (RangeState3, CellMetaBuilder?)>?
-  customBuilder;
+  final Map<CalendarCellType, (RangeState3, CellMetaBuilder?)>? customBuilder;
+  final OnRangeSelected? onRangeSelected;
 
   ///
   ///
@@ -362,6 +401,7 @@ class CalendarStyleCellRange {
     ),
     this.rangeWithinTextStyle = const TextStyle(),
     this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
+    this.onRangeSelected,
 
     ///
     ///

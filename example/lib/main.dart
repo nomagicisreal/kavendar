@@ -1,11 +1,6 @@
 import 'package:example/pages/basics_example.dart';
-import 'package:example/pages/events_example.dart';
-import 'package:example/pages/multi_example.dart';
-import 'package:example/pages/range_example.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
-import 'pages/complex_example.dart';
 
 void main() {
   initializeDateFormatting().then((_) => runApp(const MyApp()));
@@ -50,38 +45,38 @@ class _StartPageState extends State<StartPage> {
               ),
             ),
             const SizedBox(height: 12.0),
-            ElevatedButton(
-              child: const Text('Range Selection'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TableRangeExample()),
-              ),
-            ),
-            const SizedBox(height: 12.0),
-            ElevatedButton(
-              child: const Text('Events'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TableEventsExample()),
-              ),
-            ),
-            const SizedBox(height: 12.0),
-            ElevatedButton(
-              child: const Text('Multiple Selection'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TableMultiExample()),
-              ),
-            ),
-            const SizedBox(height: 12.0),
-            ElevatedButton(
-              child: const Text('Complex'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TableComplexExample()),
-              ),
-            ),
-            const SizedBox(height: 20.0),
+            // ElevatedButton(
+            //   child: const Text('Range Selection'),
+            //   onPressed: () => Navigator.push(
+            //     context,
+            //     MaterialPageRoute(builder: (_) => const TableRangeExample()),
+            //   ),
+            // ),
+            // const SizedBox(height: 12.0),
+            // ElevatedButton(
+            //   child: const Text('Events'),
+            //   onPressed: () => Navigator.push(
+            //     context,
+            //     MaterialPageRoute(builder: (_) => const TableEventsExample()),
+            //   ),
+            // ),
+            // const SizedBox(height: 12.0),
+            // ElevatedButton(
+            //   child: const Text('Multiple Selection'),
+            //   onPressed: () => Navigator.push(
+            //     context,
+            //     MaterialPageRoute(builder: (_) => const TableMultiExample()),
+            //   ),
+            // ),
+            // const SizedBox(height: 12.0),
+            // ElevatedButton(
+            //   child: const Text('Complex'),
+            //   onPressed: () => Navigator.push(
+            //     context,
+            //     MaterialPageRoute(builder: (_) => const TableComplexExample()),
+            //   ),
+            // ),
+            // const SizedBox(height: 20.0),
           ],
         ),
       ),

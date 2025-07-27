@@ -6,6 +6,18 @@ part of '../table_calendar.dart';
 ///
 
 ///
+/// TODO: integrating these with format definition ([CalendarPagingToWhere] is for only per month per page)
+///
+enum CalendarPagingToWhere {
+  correspondingDay,
+  correspondingWeekAndDay,
+  firstDateOfMonth,
+  firstDateOfFirstWeek,
+  lastDateOfMonth,
+  lastDateOfLastWeek,
+}
+
+///
 ///
 /// days x ≤ 7:
 /// - current week

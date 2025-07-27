@@ -45,27 +45,26 @@ class StyleTextButton {
   ///
   ///
   ///
-  static WidgetBuilder? _builderFromList({
+  static NotifierBuilder<int> _builderFromList({
     required CalendarStyle style,
     required StyleTextButton styleTextButton,
-    required ValueNotifier<int> weeksPerPageNotifier,
     required ValueChanged<int> notifyChanging,
   }) {
     final availables = style.formatAvailables;
-    return (context) => Padding(
+    return (weeksPerPage) => Padding(
       padding: KGeometry.edgeInsets_left_1 * 8,
       child: ValueListenableBuilder(
-        valueListenable: weeksPerPageNotifier,
-        builder: (context, weeksPerPage, child) {
+        valueListenable: weeksPerPage,
+        builder: (context, wPP, child) {
           return InkWell(
             borderRadius: styleTextButton.decoration.borderRadius?.resolve(
               context.textDirection,
             ),
             onTap: () {
-              final index = availables.indexOf(weeksPerPage);
+              final index = availables.indexOf(wPP);
               if (index == -1) {
                 throw StateError(
-                  'invalid weeks per page: $weeksPerPage\n'
+                  'invalid weeks per page: $wPP\n'
                   'availables: $availables}',
                 );
               }
@@ -75,8 +74,8 @@ class StyleTextButton {
               decoration: styleTextButton.decoration,
               padding: styleTextButton.padding,
               child: Text(
-                styleTextButton._texting?.call(weeksPerPageNotifier.value) ??
-                    _textWeek(availables)(weeksPerPageNotifier.value),
+                styleTextButton._texting?.call(weeksPerPage.value) ??
+                    _textWeek(availables)(weeksPerPage.value),
                 style: styleTextButton.textStyle,
               ),
             ),
@@ -86,16 +85,14 @@ class StyleTextButton {
     );
   }
 
-  WidgetBuilder? buildFrom(
+  NotifierBuilder<int>? builderFrom(
     CalendarStyle style,
-    ValueNotifier<int> weeksPerPageNotifier,
     ValueChanged<int> notifyChanging,
   ) {
     if (style.formatAvailables.length == 1) return null;
     return _builderFromList(
       style: style,
       styleTextButton: this,
-      weeksPerPageNotifier: weeksPerPageNotifier,
       notifyChanging: notifyChanging,
     );
   }
@@ -125,7 +122,7 @@ class StyleChevrons {
   ///
   ///
   ///
-  static PageStepperBuilder _builderChevron(
+  static PageStepperBuilder _builderFrom(
     StyleChevrons style,
     Widget icon,
     Duration duration,
@@ -140,16 +137,16 @@ class StyleChevrons {
         ),
       );
 
-  Widget buildFrom(
+  Widget builder(
     DirectionIn4 direction, {
     required PageStepper iconOnTap,
     required Duration duration,
     required Curve curve,
   }) => (switch (direction) {
     DirectionIn4.left =>
-      _bChevronLeft ?? _builderChevron(this, chevronLeft, duration, curve),
+      _bChevronLeft ?? _builderFrom(this, chevronLeft, duration, curve),
     DirectionIn4.right =>
-      _bChevronRight ?? _builderChevron(this, chevronRight, duration, curve),
+      _bChevronRight ?? _builderFrom(this, chevronRight, duration, curve),
     _ => throw StateError('invalid direction $direction'),
   })(iconOnTap);
 }

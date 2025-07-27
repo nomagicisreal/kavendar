@@ -1,10 +1,66 @@
 import 'package:damath/damath.dart';
 
 ///
+/// prevent error message be string in [Object] extension
 /// rename [printThing] to printThis with mapper and Object?
+/// update all DateTime utc functions to normal construction, utc must named with utc
+///
+
+typedef IndexingDate = DateTime Function(int index);
+
+///
 ///
 ///
 extension DTExt on DateTime {
+  ///
+  ///
+  ///
+  static double pageFrom(DateTime start, DateTime target, int weeksPerPage) =>
+      (target.difference(start).inDays + 1) /
+      (DateTime.daysPerWeek * weeksPerPage);
+
+  ///
+  ///
+  ///
+  static bool predicateFalse(DateTime date) => false;
+  static bool predicateToday(DateTime date) => date.isSameDate(DateTime.now());
+
+  static bool predicateWeekend(DateTime date) {
+    final day = date.weekday;
+    return day == DateTime.sunday || day == DateTime.saturday;
+  }
+
+  static bool predicateWeekday(DateTime date) {
+    final day = date.weekday;
+    return day == DateTime.monday ||
+        day == DateTime.tuesday ||
+        day == DateTime.wednesday ||
+        day == DateTime.thursday ||
+        day == DateTime.friday;
+  }
+
+  ///
+  ///
+  ///
+  static IndexingDate daysToDateClampFrom(
+    DateTime start,
+    DateTime end, {
+    bool fullWeek = true,
+    int startingWeekday = DateTime.sunday,
+    int times = 1,
+  }) {
+    if (fullWeek) {
+      start = start.firstDateOfWeek(startingWeekday);
+      end = end.firstDateOfWeek(startingWeekday);
+    } else {
+      throw UnimplementedError();
+    }
+    return (days) {
+      final date = DateTime(start.year, start.month, start.day + days * times);
+      return date.isAfter(end) ? end : date;
+    };
+  }
+
   ///
   /// [isSameDate], [isDifferentDate]
   /// [isSameTime], [isDifferentTime]
@@ -126,18 +182,18 @@ extension DTExt on DateTime {
   DateTime dateAddDays(int n) => DateTime(year, month, day + n);
 
   ///
-  /// [dates], [datesFromNowTo]
-  /// [datesFrom], [datesToNowFrom]
+  /// [datesGenerateFrom], [datesGenerate]
+  /// [datesGenerateBegin], [datesGenerateBack]
   ///
-  List<DateTime> dates(int length, [int from = 0]) =>
+  List<DateTime> datesGenerateFrom(int length, [int from = 0]) =>
       List.generate(length, (i) => DateTime(year, month, day + from + i));
 
-  List<DateTime> datesFromNowTo(int length) =>
+  List<DateTime> datesGenerate(int length) =>
       List.generate(length, (i) => DateTime(year, month, day + i));
 
-  List<DateTime> datesFrom(int length, [int begin = 0]) =>
+  List<DateTime> datesGenerateBegin(int length, [int begin = 0]) =>
       List.generate(length, (i) => DateTime(year, month, day + begin - i));
 
-  List<DateTime> datesToNowFrom(int length) =>
+  List<DateTime> datesGenerateBack(int length) =>
       List.generate(length, (i) => DateTime(year, month, day - i));
 }
