@@ -6,7 +6,33 @@ import 'package:damath/damath.dart';
 /// update all DateTime utc functions to normal construction, utc must named with utc
 ///
 
+typedef ListenListener = void Function(void Function());
 typedef IndexingDate = DateTime Function(int index);
+
+extension NodeNextExtension<T, N extends NodeNext<T, N>> on N? {
+  bool contains(T value) {
+    for (var node = this; node != null; node = node.next) {
+      if (value == node.data) return true;
+    }
+    return false;
+  }
+
+  bool pullByRemove(T value) {
+    var current = this;
+    for (
+      var next = current?.next;
+      next != null;
+      current = next, next = next.next
+    ) {
+      if (value == current?.data) {
+        current?.data = next.data;
+        current?.next = next.next;
+        return true;
+      }
+    }
+    return false;
+  }
+}
 
 ///
 ///
@@ -23,6 +49,7 @@ extension DTExt on DateTime {
   ///
   ///
   static bool predicateFalse(DateTime date) => false;
+
   static bool predicateToday(DateTime date) => date.isSameDate(DateTime.now());
 
   static bool predicateWeekend(DateTime date) {
@@ -38,6 +65,15 @@ extension DTExt on DateTime {
         day == DateTime.thursday ||
         day == DateTime.friday;
   }
+
+  ///
+  ///
+  ///
+  static DateTime max(DateTime date1, DateTime date2) =>
+      date1.isBefore(date2) ? date2 : date1;
+
+  static DateTime min(DateTime date1, DateTime date2) =>
+      date1.isBefore(date2) ? date1 : date2;
 
   ///
   ///
@@ -158,6 +194,8 @@ extension DTExt on DateTime {
 
   DateTime dateAddMonths(int n) => DateTime(year, month + n, day);
 
+  DateTime dateAddDays(int n) => DateTime(year, month, day + n);
+
   ///
   ///
   ///
@@ -178,8 +216,6 @@ extension DTExt on DateTime {
     keepMillisecond ? millisecond : 0,
     keepMicrosecond ? microsecond : 0,
   );
-
-  DateTime dateAddDays(int n) => DateTime(year, month, day + n);
 
   ///
   /// [datesGenerateFrom], [datesGenerate]

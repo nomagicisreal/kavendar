@@ -1,4 +1,8 @@
-part of '../table_calendar.dart';
+import 'package:damath/damath.dart';
+import 'package:datter/datter.dart';
+import 'package:flutter/material.dart';
+
+import 'datter.dart';
 
 ///
 ///
@@ -45,37 +49,27 @@ class StyleTextButton {
   ///
   ///
   ///
-  static NotifierBuilder<int> _builderFromList({
-    required CalendarStyle style,
+  static NotifierBuilder<int> _builderFromList<T>({
+    required List<T> items,
     required StyleTextButton styleTextButton,
     required ValueChanged<int> notifyChanging,
   }) {
-    final availables = style.formatAvailables;
+    final weekOf = styleTextButton._texting ?? _textWeek(items);
     return (weeksPerPage) => Padding(
       padding: KGeometry.edgeInsets_left_1 * 8,
       child: ValueListenableBuilder(
         valueListenable: weeksPerPage,
-        builder: (context, wPP, child) {
+        builder: (context, index, child) {
           return InkWell(
             borderRadius: styleTextButton.decoration.borderRadius?.resolve(
               context.textDirection,
             ),
-            onTap: () {
-              final index = availables.indexOf(wPP);
-              if (index == -1) {
-                throw StateError(
-                  'invalid weeks per page: $wPP\n'
-                  'availables: $availables}',
-                );
-              }
-              notifyChanging((index + 1) % availables.length);
-            },
+            onTap: () => notifyChanging((index + 1) % items.length),
             child: Container(
               decoration: styleTextButton.decoration,
               padding: styleTextButton.padding,
               child: Text(
-                styleTextButton._texting?.call(weeksPerPage.value) ??
-                    _textWeek(availables)(weeksPerPage.value),
+                weekOf(weeksPerPage.value),
                 style: styleTextButton.textStyle,
               ),
             ),
@@ -85,13 +79,13 @@ class StyleTextButton {
     );
   }
 
-  NotifierBuilder<int>? builderFrom(
-    CalendarStyle style,
+  NotifierBuilder<int>? builderFrom<T>(
+    List<T> availableFormats,
     ValueChanged<int> notifyChanging,
   ) {
-    if (style.formatAvailables.length == 1) return null;
+    if (availableFormats.length == 1) return null;
     return _builderFromList(
-      style: style,
+      items: availableFormats,
       styleTextButton: this,
       notifyChanging: notifyChanging,
     );

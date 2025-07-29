@@ -6,8 +6,8 @@ part of '../table_calendar.dart';
 /// [CalendarStyleHeader]
 /// [CalendarStyleWeekNumber]
 /// [CalendarStyleDayOfWeek]
-/// [CalendarStyleCellMark]
-/// [CalendarStyleCellRange]
+/// [CalendarStyleCellOverlay]
+/// [CalendarStyleCellBackground]
 ///
 ///
 
@@ -99,7 +99,7 @@ class CalendarStyleHeader {
     required ValueChanged<int> updateFormatIndex,
   }) {
     final buildFormatButton = styleFormatButton?.builderFrom(
-      style,
+      style.formatAvailables,
       updateFormatIndex,
     );
     final buildChevron = styleChevrons?.builder;
@@ -247,7 +247,7 @@ class CalendarStyleDayOfWeek {
 ///
 ///
 ///
-class CalendarStyleCellMark {
+class CalendarStyleCellOverlay {
   final int max;
   final double? size;
   final double sizeScale;
@@ -257,7 +257,7 @@ class CalendarStyleCellMark {
   final Decoration decoration;
   final PositionedLayout? _layout;
 
-  const CalendarStyleCellMark({
+  const CalendarStyleCellOverlay({
     this.max = 4,
     this.size,
     this.sizeScale = 0.2,
@@ -274,7 +274,7 @@ class CalendarStyleCellMark {
   ///
   ///
   ///
-  static PositionedLayout _layoutFrom(CalendarStyleCellMark style) => (
+  static PositionedLayout _layoutFrom(CalendarStyleCellOverlay style) => (
     constraints,
   ) {
     final shorterSide = FBoxConstraints.shortSide(constraints);
@@ -297,7 +297,7 @@ class CalendarStyleCellMark {
   ///
   ///
   static EventSingleBuilder<T> _singleDecoration<T>(
-    CalendarStyleCellMark style,
+    CalendarStyleCellOverlay style,
   ) =>
       (day, event) => Container(
         width: style.size,
@@ -306,7 +306,7 @@ class CalendarStyleCellMark {
         decoration: style.decoration,
       );
 
-  static EventsBuilder<T> _allPositionedRow<T>(CalendarStyleCellMark style) {
+  static EventsBuilder<T> _allPositionedRow<T>(CalendarStyleCellOverlay style) {
     final layout = style.layout;
     return (constraints, dateTime, events, mark) {
       if (events.isEmpty) return null;
@@ -356,11 +356,7 @@ class CalendarStyleCellMark {
 ///
 ///
 ///
-class CalendarStyleCellRange {
-  final CellMetaBuilder? _bStart;
-  final CellMetaBuilder? _bWithin;
-  final CellMetaBuilder? _bEnd;
-  final ConstraintsRangeBuilder? _bHighlight;
+class CalendarStyleCellBackground {
   final HighlightWidthFrom<CalendarStyle> widthFrom;
   final Map<CalendarCellType, (RangeState3, CellMetaBuilder?)>? customBuilder;
   final OnRangeSelected? onRangeSelected;
@@ -377,7 +373,7 @@ class CalendarStyleCellRange {
   final TextStyle rangeWithinTextStyle;
   final Decoration rangeWithinDecoration;
 
-  const CalendarStyleCellRange({
+  const CalendarStyleCellBackground({
     ///
     ///
     ///
@@ -403,19 +399,9 @@ class CalendarStyleCellRange {
     this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
     this.onRangeSelected,
 
-    ///
-    ///
-    ///
-    CellMetaBuilder? builderRangeStart,
-    CellMetaBuilder? builderRangeIn,
-    CellMetaBuilder? builderRangeEnd,
-    ConstraintsRangeBuilder? builderRangeHighlight,
     this.widthFrom = _widthFrom,
     this.customBuilder,
-  }) : _bStart = builderRangeStart,
-       _bWithin = builderRangeIn,
-       _bEnd = builderRangeEnd,
-       _bHighlight = builderRangeHighlight;
+  });
 
   static BoxConstraintsDouble _widthFrom(CalendarStyle style) =>
       (constraints) =>
@@ -424,48 +410,9 @@ class CalendarStyleCellRange {
   ///
   ///
   ///
-  // static CellConstraintsBuilder _builderRangeWithin(
-  //   CalendarStyle style,
-  //   CalendarStyleCellRange styleRange,
-  // ) =>
-  //     (date, _, locale, __) => CalendarStyle._buildContainer(
-  //       date: date,
-  //       style: style,
-  //       locale: locale,
-  //       decoration: styleRange.rangeWithinDecoration,
-  //       textStyle: styleRange.rangeWithinTextStyle,
-  //     );
-  //
-  // static CellConstraintsBuilder _builderRangeEnd(
-  //   CalendarStyle style,
-  //   CalendarStyleCellRange styleRange,
-  // ) =>
-  //     (date, _, locale, __) => CalendarStyle._buildContainer(
-  //       date: date,
-  //       style: style,
-  //       locale: locale,
-  //       decoration: styleRange.rangeEndDecoration,
-  //       textStyle: styleRange.rangeEndTextStyle,
-  //     );
-  //
-  // static CellConstraintsBuilder _builderRangeStart(
-  //   CalendarStyle style,
-  //   CalendarStyleCellRange styleRange,
-  // ) =>
-  //     (date, _, locale, __) => CalendarStyle._buildContainer(
-  //       date: date,
-  //       style: style,
-  //       locale: locale,
-  //       decoration: styleRange.rangeStartDecoration,
-  //       textStyle: styleRange.rangeStartTextStyle,
-  //     );
-
-  ///
-  ///
-  ///
   static ConstraintsRangeBuilder _backgroundHighlight(
     CalendarStyle style,
-    CalendarStyleCellRange styleRange,
+    CalendarStyleCellBackground styleRange,
   ) {
     final doubleFrom = styleRange.widthFrom(style);
     return (s, constraints) => Center(

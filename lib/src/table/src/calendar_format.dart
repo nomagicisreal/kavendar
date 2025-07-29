@@ -1,10 +1,100 @@
 // ignore_for_file: constant_identifier_names
 part of '../table_calendar.dart';
 
-/// TODO: clean [Calendar], [CalendarStyle], define [CalendarFormat] integrating calendar scopes, weeksPerPage, other 'how to page' functions
-/// TODO: think if there is a format using ValueListenableBuilder for each cell.
 ///
+///
+/// [OnDateChanged], ...
+/// [PredicateCell], ...
+/// [EventSingleBuilder], ...
+///
+///
+typedef OnPageChanged =
+    void Function(int index, int indexPrevious, DateTime focusedDate);
 
+typedef OnDateChanged = void Function(DateTime date, DateTime datePrevious);
+
+typedef OnRangeSelected =
+    void Function(DateTime? start, DateTime? end, DateTime focusedDate);
+
+///
+///
+///
+typedef CalendarPageControllerInitializer =
+    PageController Function(
+      DateTimeRange domain,
+      int weeksPerPage,
+      DateTime dateFocused,
+    );
+
+///
+///
+///
+typedef DateBuilder = Widget Function(DateTime date);
+typedef DateLocaleBuilder = Widget Function(DateTime date, dynamic locale);
+typedef CellMetaBuilder =
+    Widget? Function(
+      DateTime date,
+      DateTime? focusedDate,
+      CalendarCellType cellType,
+      BoxConstraints constraints,
+    );
+
+typedef CellBuilder =
+    Widget Function(
+      DateTime date,
+      DateTime? focusedDate,
+      CalendarCellType cellType,
+      BoxConstraints constraints,
+      Widget child,
+    );
+
+typedef TableRowsBuilder =
+    Widget Function(List<DateTime> dates, DateBuilder buildCell);
+
+///
+///
+///
+typedef ConstraintsRangeBuilder =
+    Widget Function(RangeState3 state, BoxConstraints constraints);
+
+typedef BoxConstraintsDouble = double Function(BoxConstraints constraints);
+
+typedef HighlightWidthFrom<T> = BoxConstraintsDouble Function(T style);
+
+//
+typedef EventSingleBuilder<T> = Widget? Function(DateTime dateTime, T event);
+
+typedef EventsBuilder<T> =
+    Widget? Function(
+      BoxConstraints constraints,
+      DateTime dateTime,
+      List<T> events,
+      EventSingleBuilder<T> mark,
+    );
+
+typedef EventLoader<T> = List<T> Function(DateTime date);
+typedef EventElementMark<T> =
+    EventSingleBuilder<T> Function(
+      BoxConstraints constraints,
+      CalendarStyleCellOverlay style,
+    );
+typedef EventsLayoutMark<T> =
+    EventsBuilder<T> Function(
+      BoxConstraints constraints,
+      CalendarStyleCellOverlay style,
+    );
+
+///
+///
+///
+typedef CalendarCellConfiguration = Map<CalendarCellType, Predicator<DateTime>>;
+
+typedef MarkConfiguration<T> =
+    Map<CalendarCellType, (EventsLayoutMark<T>?, EventElementMark<T>?)>;
+
+///
+/// TODO: clean [Calendar], [CalendarStyle], define [CalendarFormat] integrating calendar scopes, weeksPerPage, other 'how to page' functions
+/// TODO: think if there is any format using ValueListenableBuilder for each cell.
 ///
 /// TODO: integrating these with format definition ([CalendarPagingToWhere] is for only per month per page)
 ///
@@ -130,6 +220,5 @@ enum CalendarPagingToWhere {
 //       this.blockOutsideMonthDate,
 //       );
 // }
-
 
 // TODO: schedule enable viewing times period in a date, calendar extends schedule
