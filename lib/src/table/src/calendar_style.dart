@@ -3,12 +3,6 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [CalendarStyle]
-///
-///
-
-///
-///
 /// [CalendarStyle] layout depends on parent constrains, it's better not to specify height
 ///
 ///
@@ -28,7 +22,7 @@ class CalendarStyle {
   final ValueChanged<int>? formatOnChanged;
   final Duration formatAnimationDuration;
   final Curve formatAnimationCurve;
-  final CalendarPagingToWhere? formatPagingToWhere;
+  final CalendarPageNext? formatPagingToWhere;
   final Duration pagingDuration;
   final Curve pagingCurve;
   final CalendarPageControllerInitializer pageControllerInitializer;
@@ -66,7 +60,6 @@ class CalendarStyle {
   final Predicator<DateTime> predicateWeekend;
   final Predicator<DateTime> predicateWeekday;
   final OnDateChanged? onDateFocused;
-  final OnDateChanged? onDateLongPressed;
   final OnPageChanged? onPageChanged;
   final void Function(PageController pageController)? onInitState;
 
@@ -116,7 +109,7 @@ class CalendarStyle {
     Map<int, TableColumnWidth>? tableColumnWidth,
 
     ///
-    /// TODO: enable range decoration, text style
+    /// TODO: defin my custom style
     ///
     this.cellSetup = const [
       (
@@ -180,7 +173,6 @@ class CalendarStyle {
     this.predicateWeekend = DTExt.predicateWeekend,
     this.predicateWeekday = DTExt.predicateWeekday,
     this.onDateFocused,
-    this.onDateLongPressed,
     this.onPageChanged,
     this.onInitState,
   }) : _tableColumnWidth = tableColumnWidth;
@@ -247,14 +239,14 @@ class CalendarStyle {
     if (weeksPerPage == CalendarStyle.weeksPerPage_6) {
       return switch (formatPagingToWhere) {
         null => null,
-        CalendarPagingToWhere.correspondingDay => throw UnimplementedError(),
-        CalendarPagingToWhere.correspondingWeekAndDay =>
+        CalendarPageNext.correspondingDay => throw UnimplementedError(),
+        CalendarPageNext.correspondingWeekAndDay =>
           throw UnimplementedError(),
-        CalendarPagingToWhere.firstDateOfMonth => throw UnimplementedError(),
-        CalendarPagingToWhere.firstDateOfFirstWeek =>
+        CalendarPageNext.firstDateOfMonth => throw UnimplementedError(),
+        CalendarPageNext.firstDateOfFirstWeek =>
           throw UnimplementedError(),
-        CalendarPagingToWhere.lastDateOfMonth => throw UnimplementedError(),
-        CalendarPagingToWhere.lastDateOfLastWeek => throw UnimplementedError(),
+        CalendarPageNext.lastDateOfMonth => throw UnimplementedError(),
+        CalendarPageNext.lastDateOfLastWeek => throw UnimplementedError(),
       };
     } else {
       throw UnimplementedError();
@@ -399,7 +391,6 @@ class CalendarStyle {
     required EventLoader<T>? eventLoader,
     required EventsLayoutMark<T>? eventsLayoutMark,
     required EventElementMark<T>? eventLayoutSingleMark,
-    required MarkConfiguration<T>? eventMarkConfiguration,
   }) {
     final buildBackground = styleCellBackground?.builderFrom(
       style: this,
@@ -409,7 +400,6 @@ class CalendarStyle {
       eventLoader: eventLoader,
       eventsLayoutMark: eventsLayoutMark,
       eventLayoutSingleMark: eventLayoutSingleMark,
-      customMark: eventMarkConfiguration,
     );
 
     return buildBackground == null

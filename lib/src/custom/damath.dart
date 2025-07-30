@@ -5,32 +5,61 @@ import 'package:damath/damath.dart';
 /// rename [printThing] to printThis with mapper and Object?
 /// update all DateTime utc functions to normal construction, utc must named with utc
 ///
+/// set next(covariant NodeNext<T, N>? node) =>
+/// to N?
+///
 
 typedef ListenListener = void Function(void Function());
 typedef IndexingDate = DateTime Function(int index);
 
-extension NodeNextExtension<T, N extends NodeNext<T, N>> on N? {
+extension NodeNextExtension<T, N extends NodeNext<T, N>> on N {
   bool contains(T value) {
-    for (var node = this; node != null; node = node.next) {
+    for (N? node = this; node != null; node = node.next) {
       if (value == node.data) return true;
     }
     return false;
   }
 
-  bool pullByRemove(T value) {
-    var current = this;
+  N? nodeFrom(T value) {
     for (
-      var next = current?.next;
+      N? current = this, next = current.next;
       next != null;
       current = next, next = next.next
     ) {
-      if (value == current?.data) {
-        current?.data = next.data;
-        current?.next = next.next;
+      if (value == current?.data) return current;
+    }
+    return null;
+  }
+
+  static const String cuttingOnHeadNode = 'cutting on head node';
+
+  ///
+  /// [cutFirst] for example:
+  /// ```dart
+  /// print(node); // A - A - B - B - C - C
+  /// print(node.cutFirst(B)); // false
+  /// print(node); // A - A - B - C - C
+  ///
+  /// print(node2); // B - B - C - C
+  /// if (node2.cutFirst(B)) { // true
+  ///   node2 = node2.next;
+  /// }
+  /// print(node2); // B - C - C
+  /// ```
+  ///
+  bool cutFirst(T value) {
+    if (value == data) return false;
+    for (
+      N? current = this, next = current.next, nextNext = next?.next;
+      next != null;
+      current = next, next = next.next, nextNext = next?.next
+    ) {
+      if (value == next.data) {
+        current?.next = nextNext;
         return true;
       }
     }
-    return false;
+    return true;
   }
 }
 

@@ -89,26 +89,13 @@ typedef EventsLayoutMark<T> =
 ///
 typedef CalendarCellConfiguration = Map<CalendarCellType, Predicator<DateTime>>;
 
-typedef MarkConfiguration<T> =
-    Map<CalendarCellType, (EventsLayoutMark<T>?, EventElementMark<T>?)>;
-
 ///
-/// TODO: clean [Calendar], [CalendarStyle], define [CalendarFormat] integrating calendar scopes, weeksPerPage, other 'how to page' functions
-/// TODO: think if there is any format using ValueListenableBuilder for each cell.
+/// todo: ValueListenableBuilder for each cell.
 ///
-/// TODO: integrating these with format definition ([CalendarPagingToWhere] is for only per month per page)
-///
-enum CalendarPagingToWhere {
-  correspondingDay,
-  correspondingWeekAndDay,
-  firstDateOfMonth,
-  firstDateOfFirstWeek,
-  lastDateOfMonth,
-  lastDateOfLastWeek,
-}
 
 ///
 ///
+/// todo: figure out how many possible calendar format
 /// days x ≤ 7:
 /// - current week
 /// - cross weeks till 7 days
@@ -221,4 +208,3 @@ enum CalendarPagingToWhere {
 //       );
 // }
 
-// TODO: schedule enable viewing times period in a date, calendar extends schedule

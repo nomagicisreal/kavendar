@@ -19,7 +19,6 @@ class Calendar<T> extends StatefulWidget {
   final EventsLayoutMark<T>? eventsLayoutMark;
   final EventElementMark<T>? eventLayoutSingleMark;
   final EventLoader<T>? eventLoader;
-  final MarkConfiguration<T>? eventMarkConfiguration;
 
   Calendar({
     super.key,
@@ -30,7 +29,6 @@ class Calendar<T> extends StatefulWidget {
     this.eventsLayoutMark,
     this.eventLayoutSingleMark,
     this.eventLoader,
-    this.eventMarkConfiguration,
   }) : assert(style.formatAvailables.contains(weeksPerPage)),
        assert(
          style.formatAvailables.length <= CalendarStyle.weeksPerPage_all.length,
@@ -124,7 +122,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
     super.didUpdateWidget(oldWidget);
     final style = widget.style;
     if (style != oldWidget.style) {
-      // TODO: update entire calendar style by updating widget
+      // todo: update entire calendar style by updating widget
       _style = style;
       return;
     }
@@ -146,21 +144,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
   }
 
   ///
-  /// [_onDateTapped]
   /// [_onPageChanged]
   /// [_updateFormatIndex]
   ///
-  void _onDateTapped(DateTime dateTapped) {
-    final dateFocused = _focus.dateFocused;
-    if (dateTapped == dateFocused) {
-      _focus.continueFocusing(setState);
-      return;
-    }
-    if (_focus.newFocus(setState, dateTapped)) {
-      _style.onDateFocused?.call(dateTapped, dateFocused);
-    }
-  }
-
   void _onPageChanged(int index) {
     if (index == _indexPrevious) return;
     final indexPrevious = _indexPrevious;
@@ -217,15 +203,8 @@ class _CalendarState<T> extends State<Calendar<T>> {
       eventLoader: widget.eventLoader,
       eventsLayoutMark: widget.eventsLayoutMark,
       eventLayoutSingleMark: widget.eventLayoutSingleMark,
-      eventMarkConfiguration: widget.eventMarkConfiguration,
     );
     final buildCell = style._buildCell;
-    final onDateLongPressed = style.onDateLongPressed;
-    final VoidCallback? Function(DateTime, DateTime) onLongPress =
-        onDateLongPressed == null
-            ? (date, dateFocused) => null
-            : (date, dateFocused) => () => onDateLongPressed(date, dateFocused);
-
     return (date) {
       Widget? child;
       if (!_predicateBlocked(date)) {
@@ -235,10 +214,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
           if (!predicate(date)) continue;
           child = LayoutBuilder(
             builder: (context, constraints) {
-              final dateFocused = _focus.dateFocused;
               final child = buildCellStack(
                 date,
-                dateFocused,
+                _focus.dateFocused,
                 cellType,
                 constraints,
                 buildCell(date, widget.locale, current.$2),
@@ -247,8 +225,11 @@ class _CalendarState<T> extends State<Calendar<T>> {
                   ? child
                   : GestureDetector(
                     behavior: cellHitTestBehavior,
-                    onTap: () => _onDateTapped(date),
-                    onLongPress: onLongPress(date, dateFocused),
+                    onTap: _focus.onFocusDate(
+                      setState,
+                      date,
+                      style.onDateFocused,
+                    ),
                     child: child,
                   );
             },

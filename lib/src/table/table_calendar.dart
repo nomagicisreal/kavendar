@@ -9,9 +9,13 @@ import 'package:kavendar/src/custom/damath.dart';
 import 'package:kavendar/src/custom/datter.dart';
 import 'package:kavendar/src/custom/datter_style.dart';
 
+part 'src/calendar_focus.dart';
 part 'src/calendar_format.dart';
 part 'src/calendar_paging.dart';
 part 'src/calendar_style.dart';
-part 'src/calendar_style_extension.dart';
+part 'src/calendar_style_cell.dart';
+part 'src/calendar_style_element.dart';
 part 'src/calendar_widget.dart';
-part 'src/calendar_focus.dart';
+
+
+// todo: figure out how to animate from calendar page view to schedule page view

@@ -11,14 +11,8 @@ part of '../table_calendar.dart';
 ///
 
 ///
-/// [_CalendarFocus] is a class handle [_CalendarState._onDateTapped]
+/// [_CalendarFocus] is a class handle date cell gesture
 /// normal date  -> focused date -> selected date
-/// when there is a selected date:
-/// 1. continue selecting date by date
-/// 2. continue selecting by ranging dates
-/// 3. cancel selection date by date (remove selection, split range selection)
-/// 4. cancel all selection
-///
 ///
 abstract base class _CalendarFocus {
   DateTime get dateFocused;
@@ -27,6 +21,9 @@ abstract base class _CalendarFocus {
 
   const _CalendarFocus._();
 
+  ///
+  ///
+  ///
   factory _CalendarFocus(Calendar widget) {
     final style = widget.style;
     final dateFocused = widget.focusedDate ?? DateTime.now().dateOnly;
@@ -35,19 +32,41 @@ abstract base class _CalendarFocus {
     } else {
       return _CalendarFocusSelection(dateFocused);
     }
-    throw UnimplementedError();
+    // throw UnimplementedError();
   }
 
-  // static Never _noSuchProperty(String name) =>
-  //     throw StateError('[$name] is not available when [CalendarStyle.] is [].');
+  VoidCallback onFocusDate(
+    ListenListener setState,
+    DateTime dateFocused,
+    OnDateChanged? onFocusStart,
+  ) => () {
+    if (dateFocused == this.dateFocused) {
+      _continueFocus(setState);
+      return;
+    }
+    if (_newFocus(setState, dateFocused)) {
+      onFocusStart?.call(dateFocused, this.dateFocused);
+    }
+  };
 
-  void continueFocusing(ListenListener setState);
+  // VoidCallback onDateLongPressed(
+  //     ListenListener setState,
+  //     DateTime dateTapped,
+  //     OnDateChanged? onDateFocused,
+  //     ) => () {
+  //   final dateFocused = this.dateFocused;
+  // };
 
   ///
-  /// return `true`  if focused on new date due to new intention
-  /// return `false` if focused on new date due to old intention
+  /// [_continueFocus] is called when tapped date is focused date
   ///
-  bool newFocus(ListenListener setState, DateTime dateTapped);
+  void _continueFocus(ListenListener setState);
+
+  ///
+  /// return `true`  when [date] is a new focused date
+  /// return `false` when [date] is not a new focused date
+  ///
+  bool _newFocus(ListenListener setState, DateTime date);
 }
 
 abstract base class _CalendarFocusParent extends _CalendarFocus {
@@ -61,11 +80,11 @@ base class _CalendarFocusOnly extends _CalendarFocusParent {
   _CalendarFocusOnly(super.dateFocused);
 
   @override
-  void continueFocusing(ListenListener setState) {}
+  void _continueFocus(ListenListener setState) {}
 
   @override
-  bool newFocus(ListenListener setState, DateTime dateTapped) {
-    setState(() => dateFocused = dateTapped);
+  bool _newFocus(ListenListener setState, DateTime date) {
+    setState(() => dateFocused = date);
     return true;
   }
 }
@@ -74,62 +93,95 @@ base class _CalendarFocusOnly extends _CalendarFocusParent {
 ///
 ///
 base class _CalendarFocusSelection extends _CalendarFocusParent {
-  NodeNextSorted<DateTime>? _dateSelected;
-  bool readyToRange = false;
-
   _CalendarFocusSelection(super.dateFocused);
 
   ///
-  /// 1. continue focus to select
-  /// 2. continue focus to select range
+  /// [_dateSelected], [readyToRangePeriod]
+  /// [_unselect], [unselectAll]
+  ///
+  NodeNextSorted<DateTime>? _dateSelected; // todo: sorted identical set
+  bool readyToRangePeriod = false;
+
+  void _unselect(DateTime date) {
+    if (_dateSelected!.cutFirst(date)) {
+      _dateSelected = _dateSelected?.next;
+    }
+  }
+
+  void unselectAll() {
+    _dateSelected = null;
+    readyToRangePeriod = false;
+  }
+
+  ///
+  /// 1. continue focus to create new selection
+  /// 2. continue focus to add more selection
+  /// 3. continue focus to ready to ranging period selection
+  /// 4. continue focus to cancel current selection
   ///
   @override
-  void continueFocusing(ListenListener setState) {
+  void _continueFocus(ListenListener setState) {
     final dateSelected = _dateSelected;
+
     if (dateSelected == null) {
+      // 1.
       _dateSelected = NodeNextSorted.mutable(dateFocused);
+    } else {
+      if (dateSelected.contains(dateFocused)) {
+        if (readyToRangePeriod) {
+          // 4.
+          _unselect(dateFocused);
+          readyToRangePeriod = false;
+        } else {
+          // 3.
+          readyToRangePeriod = true;
+        }
+      } else {
+        // 2.
+        dateSelected.push(dateFocused);
+      }
     }
-    readyToRange = true;
     setState(FListener.none);
   }
 
   ///
-  /// return `true`  if focused on new date without any selection
-  /// return `false` if focused on new date with selection
+  /// return `true`  only when there is no selection
+  /// return `false` when there are selection before [_newFocus] been called
+  ///   1. [date] have to be removed from the selection
+  ///   2. [date] have to be selected
+  ///   3. [date] and the dates between [date] and [dateFocused] have to be in the selection
   ///
   @override
-  bool newFocus(ListenListener setState, DateTime dateTapped) {
+  bool _newFocus(ListenListener setState, DateTime date) {
+    //
     final dateSelected = _dateSelected;
     if (dateSelected == null) {
-      setState(() => dateFocused = dateTapped);
-      readyToRange = false;
+      setState(() => dateFocused = date);
       return true;
     }
-    if (readyToRange) {
-      final dateFocused = this.dateFocused;
-      assert(dateSelected.contains(dateFocused));
-      final range =
-          dateFocused.isBefore(dateTapped)
-              ? (dateFocused, dateTapped)
-              : (dateTapped, dateFocused);
-      final finalDate = range.$2.addDays(1);
-      for (
-        var date = range.$1.dateAddDays(1);
-        date.isBefore(finalDate);
-        date = date.dateAddDays(1)
-      ) {
+
+    //
+    if (dateSelected.contains(date)) {
+      // 1.
+      _unselect(date);
+    } else {
+      if (readyToRangePeriod) {
+        // 3.
+        final range =
+            dateFocused.isBefore(date)
+                ? (dateFocused, date)
+                : (date, dateFocused);
+        final dateEnd = range.$2;
+        dateSelected.push(dateEnd);
+        for (var d = range.$1; d.isBefore(dateEnd); d = d.dateAddDays(1)) {
+          dateSelected.push(d);
+        }
+      } else {
+        // 2.
         dateSelected.push(date);
       }
-      setState(FListener.none);
-    } else {
-      setState(() {
-        if (!dateSelected.pullByRemove(dateTapped)) {
-          dateSelected.push(dateTapped);
-        }
-      });
     }
-    readyToRange = false;
+    setState(FListener.none);
     return false;
   }
-
 }
