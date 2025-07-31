@@ -5,9 +5,15 @@ part of '../table_calendar.dart';
 ///
 /// [CalendarStyle] layout depends on parent constrains, it's better not to specify height
 ///
+/// [domain], ...
+/// [_heightBody], ...
+/// [_buildCell], ...
+/// [_initCellStackBuilder], ...
+///
 ///
 class CalendarStyle {
   final DateTimeFormatter dateTextFormatter;
+  final CalendarFocusInitializer focusInitializer;
   final int verticalFlex;
   final FlexFit verticalFlexFit;
   final ScrollPhysics? horizontalScroll;
@@ -33,20 +39,17 @@ class CalendarStyle {
   final CalendarStyleHeader? styleHeader;
   final CalendarStyleDayOfWeek? styleDayOfWeek;
   final CalendarStyleWeekNumber? styleWeekNumber;
-  final CalendarStyleCellOverlay? styleCellOverlay;
-  final CalendarStyleCellBackground? styleCellBackground;
+  final CalendarStyleCellStack? styleCellStack;
 
   ///
   ///
   ///
-  final List<(CalendarCellType, DecorationTextStyle)> cellSetup;
+  final List<CalendarCell> cellPrioritization;
   final HitTestBehavior cellHitTestBehavior;
   final EdgeInsets cellMargin;
   final EdgeInsets cellPadding;
   final AlignmentGeometry cellAlignment;
-  final AlignmentGeometry cellStackAlignment;
   final Duration cellAnimationDuration;
-  final Clip cellStackClip;
   final Decoration tableRowDecoration;
   final TableBorder tableBorder;
   final EdgeInsets tablePadding;
@@ -58,20 +61,19 @@ class CalendarStyle {
   final Predicator<DateTime> predicateDisable;
   final Predicator<DateTime> predicateHoliday;
   final Predicator<DateTime> predicateWeekend;
-  final Predicator<DateTime> predicateWeekday;
   final OnDateChanged? onDateFocused;
   final OnPageChanged? onPageChanged;
   final void Function(PageController pageController)? onInitState;
 
   const CalendarStyle({
     this.dateTextFormatter = _dateTextFormater,
+    // this.focusInitializer = CalendarFocus.withSelection,
+    this.focusInitializer = CalendarFocus.onlyFocus,
     this.verticalFlex = 1, // 1 expand, 0 shrink
     this.verticalFlexFit = FlexFit.loose,
     this.horizontalScroll = const PageScrollPhysics(),
 
-    ///
-    ///
-    ///
+    //
     // this.format = CalendarFormatPage.month,
     this.formatDomain,
     this.formatAvailables = weeksPerPage_all,
@@ -84,84 +86,82 @@ class CalendarStyle {
     this.pagingCurve = Curves.easeOut,
     this.pageControllerInitializer = _pageController,
 
-    ///
-    ///
-    ///
+    //
     this.styleHeader = const CalendarStyleHeader(),
     this.styleDayOfWeek = const CalendarStyleDayOfWeek(),
     this.styleWeekNumber,
-    this.styleCellOverlay = const CalendarStyleCellOverlay(),
-    this.styleCellBackground,
+    this.styleCellStack,
 
-    ///
-    ///
-    ///
-    this.cellHitTestBehavior = HitTestBehavior.opaque,
-    this.cellMargin = const EdgeInsets.all(6.0),
-    this.cellPadding = EdgeInsets.zero,
-    this.cellAlignment = Alignment.center,
-    this.cellStackAlignment = Alignment.bottomCenter,
-    this.cellStackClip = Clip.none,
-    this.cellAnimationDuration = Durations.medium1,
+    //
     this.tableRowDecoration = const BoxDecoration(),
     this.tableBorder = const TableBorder(),
     this.tablePadding = EdgeInsets.zero,
     Map<int, TableColumnWidth>? tableColumnWidth,
 
-    ///
-    /// TODO: defin my custom style
-    ///
-    this.cellSetup = const [
+    //
+    this.cellHitTestBehavior = HitTestBehavior.opaque,
+    this.cellMargin = const EdgeInsets.all(6.0),
+    this.cellPadding = EdgeInsets.zero,
+    this.cellAlignment = Alignment.center,
+    this.cellAnimationDuration = Durations.medium1,
+    this.cellPrioritization = const [
       (
         CalendarCellType.disabled,
-        DecorationTextStyle(
-          BoxDecoration(shape: BoxShape.circle),
-          TextStyle(color: Color(0xFFDFDFDF)),
+        (BoxShape.circle, MaterialColorRole.transparent, null),
+        (
+          MaterialTextTheme.bodyMedium,
+          MaterialColorRole.onSurface,
+          MaterialEmphasisLevel.inactive,
         ),
       ),
       (
         CalendarCellType.focused,
-        DecorationTextStyle(
-          BoxDecoration(color: Color(0xFF5C6BC0), shape: BoxShape.circle),
-          TextStyle(color: Color(0xFFFAFAFA), fontSize: 16.0),
-        ),
-      ),
-      (
-        CalendarCellType.today,
-        DecorationTextStyle(
-          BoxDecoration(color: Color(0xFF9FA8DA), shape: BoxShape.circle),
-          TextStyle(color: Color(0xFFFAFAFA), fontSize: 16.0),
+        (BoxShape.circle, MaterialColorRole.primary, null),
+        (
+          MaterialTextTheme.bodyLarge,
+          MaterialColorRole.onPrimary,
+          MaterialEmphasisLevel.primary,
         ),
       ),
       (
         CalendarCellType.outside,
-        DecorationTextStyle(
-          BoxDecoration(shape: BoxShape.circle),
-          TextStyle(color: Color(0xFFAEAEAE)),
-        ),
-      ),
-      (
-        CalendarCellType.weekend,
-        DecorationTextStyle(
-          BoxDecoration(shape: BoxShape.circle),
-          TextStyle(color: Color(0xFF5A5A5A)),
+        (BoxShape.circle, MaterialColorRole.surface, null),
+        (
+          MaterialTextTheme.bodyMedium,
+          MaterialColorRole.onSurface,
+          MaterialEmphasisLevel.interactive,
         ),
       ),
       (
         CalendarCellType.holiday,
-        DecorationTextStyle(
-          BoxDecoration(
-            border: Border.fromBorderSide(
-              BorderSide(color: Color(0xFF9FA8DA), width: 1.4),
-            ),
-            shape: BoxShape.circle,
-          ),
-          TextStyle(color: Color(0xFF5C6BC0)),
+        (
+          BoxShape.circle,
+          MaterialColorRole.surface,
+          MaterialColorRole.outlineVariant,
+        ),
+        (
+          MaterialTextTheme.bodyMedium,
+          MaterialColorRole.onSurface,
+          MaterialEmphasisLevel.primary,
         ),
       ),
       (
-        CalendarCellType.weekday,
-        DecorationTextStyle(BoxDecoration(shape: BoxShape.circle), TextStyle()),
+        CalendarCellType.today,
+        (BoxShape.circle, MaterialColorRole.surface, MaterialColorRole.outline),
+        (
+          MaterialTextTheme.bodyLarge,
+          MaterialColorRole.onSurface,
+          MaterialEmphasisLevel.primary,
+        ),
+      ),
+      (
+        CalendarCellType.normal,
+        (BoxShape.circle, MaterialColorRole.surface, null),
+        (
+          MaterialTextTheme.bodyMedium,
+          MaterialColorRole.onSurface,
+          MaterialEmphasisLevel.primary,
+        ),
       ),
     ],
 
@@ -171,7 +171,6 @@ class CalendarStyle {
     this.predicateDisable = DTExt.predicateFalse,
     this.predicateHoliday = DTExt.predicateFalse,
     this.predicateWeekend = DTExt.predicateWeekend,
-    this.predicateWeekday = DTExt.predicateWeekday,
     this.onDateFocused,
     this.onPageChanged,
     this.onInitState,
@@ -235,16 +234,15 @@ class CalendarStyle {
       (styleDayOfWeek?.height ?? 0) -
       (styleHeader?.height ?? 0);
 
+  // todo: page next focus
   DateTime? _pageNextFocus(int weeksPerPage, int index, int indexPrevious) {
     if (weeksPerPage == CalendarStyle.weeksPerPage_6) {
       return switch (formatPagingToWhere) {
         null => null,
         CalendarPageNext.correspondingDay => throw UnimplementedError(),
-        CalendarPageNext.correspondingWeekAndDay =>
-          throw UnimplementedError(),
+        CalendarPageNext.correspondingWeekAndDay => throw UnimplementedError(),
         CalendarPageNext.firstDateOfMonth => throw UnimplementedError(),
-        CalendarPageNext.firstDateOfFirstWeek =>
-          throw UnimplementedError(),
+        CalendarPageNext.firstDateOfFirstWeek => throw UnimplementedError(),
         CalendarPageNext.lastDateOfMonth => throw UnimplementedError(),
         CalendarPageNext.lastDateOfLastWeek => throw UnimplementedError(),
       };
@@ -269,36 +267,32 @@ class CalendarStyle {
 
   ///
   /// [_buildCell]
-  /// [_buildCellStack]
-  /// [buildTableWeekDates]
+  /// [_buildTableWeekDates]
   /// [_buildTableRow], [_buildTable]
   /// [_buildBodyPage], [_buildBody]
   ///
-  Widget _buildCell(DateTime date, dynamic locale, DecorationTextStyle style) =>
-      Semantics(
-        key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
-        label:
-            '${DateFormat.EEEE(locale).format(date)}, '
-            '${DateFormat.yMMMMd(locale).format(date)}',
-        excludeSemantics: true,
-        child: AnimatedContainer(
-          duration: cellAnimationDuration,
-          margin: cellMargin,
-          padding: cellPadding,
-          decoration: style.decoration,
-          alignment: cellAlignment,
-          child: Text(dateTextFormatter(date, locale), style: style.textStyle),
-        ),
-      );
-
-  // todo: instead of being a maybe unused function, create a property (with stack | without stack)
-  Widget _buildCellStack(List<Widget> children) => Stack(
-    alignment: cellStackAlignment,
-    clipBehavior: cellStackClip,
-    children: children,
+  Widget _buildCell(
+    DateTime date,
+    dynamic locale,
+    Decoration decoration,
+    TextStyle textStyle,
+  ) => Semantics(
+    key: ValueKey('Cell-${date.year}-${date.month}-${date.day}'),
+    label:
+        '${DateFormat.EEEE(locale).format(date)}, '
+        '${DateFormat.yMMMMd(locale).format(date)}',
+    excludeSemantics: true,
+    child: AnimatedContainer(
+      duration: cellAnimationDuration,
+      margin: cellMargin,
+      padding: cellPadding,
+      decoration: decoration,
+      alignment: cellAlignment,
+      child: Text(dateTextFormatter(date, locale), style: textStyle),
+    ),
   );
 
-  static List<Widget> buildTableWeekDates(
+  static List<Widget> _buildTableWeekDates(
     List<DateTime> dates,
     int iRow,
     DateBuilder buildCell,
@@ -334,22 +328,72 @@ class CalendarStyle {
   );
 
   ///
-  /// [_initColumnBuilder]
-  /// [_initTableBuilder]
   /// [_initCellStackBuilder]
+  /// [_initTableRowsBuilder]
+  /// [_initCalendarBuilder]
   ///
-  DateBuilder _initColumnBuilder({
-    required DateBuilder? headerBuilder,
-    required ConstraintsBuilder bodyLayout,
-  }) =>
-      headerBuilder == null
-          ? (_) => _buildBody(bodyLayout)
-          : (date) => Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [headerBuilder(date), _buildBody(bodyLayout)],
-          );
+  CellBuilder _initCellStackBuilder<T>({
+    required EventLoader<T>? eventLoader,
+    required EventsLayoutMark<T>? eventsLayoutMark,
+    required EventElementMark<T>? eventLayoutSingleMark,
+  }) {
+    final styleCellStack = this.styleCellStack;
+    if (styleCellStack == null) return (_, __, ___, ____, child) => child;
+    final buildBackground = styleCellStack.styleBackground?.builderFrom(
+      style: this,
+      isBackground: true,
+    );
+    final buildOverlay = styleCellStack.styleOverlay.builderFrom(
+      eventLoader: eventLoader,
+      eventsLayoutMark: eventsLayoutMark,
+      eventLayoutSingleMark: eventLayoutSingleMark,
+    );
+    final build = styleCellStack._build;
 
-  TableRowsBuilder _initTableBuilder(
+    return buildBackground == null
+        ? (buildOverlay == null
+            ? (_, __, ___, ____, child) => child
+            : (date, focusedDate, cellType, constraints, child) {
+              final overlay = buildOverlay(
+                date,
+                focusedDate,
+                cellType,
+                constraints,
+              );
+              return build([child, if (overlay != null) overlay]);
+            })
+        : (buildOverlay == null
+            ? (date, focusedDate, cellType, constraints, child) {
+              final background = buildBackground(
+                date,
+                focusedDate,
+                cellType,
+                constraints,
+              );
+              return build([if (background != null) background, child]);
+            }
+            : (date, focusedDate, cellType, constraints, child) {
+              final overlay = buildOverlay(
+                date,
+                focusedDate,
+                cellType,
+                constraints,
+              );
+              final background = buildBackground(
+                date,
+                focusedDate,
+                cellType,
+                constraints,
+              );
+              return build([
+                if (background != null) background,
+                child,
+                if (overlay != null) overlay,
+              ]);
+            });
+  }
+
+  TableRowsBuilder _initTableRowsBuilder(
     dynamic locale,
     double heightRow,
     Predicator<DateTime> predicateBlock,
@@ -359,10 +403,10 @@ class CalendarStyle {
     final List<Widget> Function(List<DateTime>, int, DateBuilder) rowBody =
         firstColumn == null
             ? (dates, iRow, buildCell) =>
-                buildTableWeekDates(dates, iRow, buildCell)
+                _buildTableWeekDates(dates, iRow, buildCell)
             : (dates, iRow, buildCell) => [
               firstColumn(dates[DateTime.daysPerWeek * iRow]),
-              ...buildTableWeekDates(dates, iRow, buildCell),
+              ..._buildTableWeekDates(dates, iRow, buildCell),
             ];
 
     final styleDayOfWeek = this.styleDayOfWeek;
@@ -387,64 +431,25 @@ class CalendarStyle {
         ]);
   }
 
-  CellBuilder _initCellStackBuilder<T>({
-    required EventLoader<T>? eventLoader,
-    required EventsLayoutMark<T>? eventsLayoutMark,
-    required EventElementMark<T>? eventLayoutSingleMark,
+  DateBuilder _initCalendarBuilder({
+    required ConstraintsBuilder bodyLayout,
+    required PageController pageController,
+    required dynamic locale,
+    required ValueNotifier<int> pageWeeks,
+    required ValueChanged<int> updateFormatIndex,
   }) {
-    final buildBackground = styleCellBackground?.builderFrom(
+    final styleHeader = this.styleHeader;
+    if (styleHeader == null) return (_) => _buildBody(bodyLayout);
+    final headerBuilder = styleHeader.initBuilder(
+      pageController: pageController,
       style: this,
-      isBackground: true,
+      locale: locale,
+      pageWeeks: pageWeeks,
+      updateFormatIndex: updateFormatIndex,
     );
-    final buildOverlay = styleCellOverlay?.builderFrom(
-      eventLoader: eventLoader,
-      eventsLayoutMark: eventsLayoutMark,
-      eventLayoutSingleMark: eventLayoutSingleMark,
+    return (date) => Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [headerBuilder(date), _buildBody(bodyLayout)],
     );
-
-    return buildBackground == null
-        ? (buildOverlay == null
-            ? (_, __, ___, ____, child) => child
-            : (date, focusedDate, cellType, constraints, child) {
-              final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _buildCellStack([child, if (overlay != null) overlay]);
-            })
-        : (buildOverlay == null
-            ? (date, focusedDate, cellType, constraints, child) {
-              final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _buildCellStack([
-                if (background != null) background,
-                child,
-              ]);
-            }
-            : (date, focusedDate, cellType, constraints, child) {
-              final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
-                constraints,
-              );
-              return _buildCellStack([
-                if (background != null) background,
-                child,
-                if (overlay != null) overlay,
-              ]);
-            });
   }
 }

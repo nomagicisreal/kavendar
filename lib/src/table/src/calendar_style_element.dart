@@ -1,26 +1,11 @@
 part of '../table_calendar.dart';
 
 ///
-/// [CalendarCellType]
-///
 /// [CalendarStyleHeader]
 /// [CalendarStyleWeekNumber]
 /// [CalendarStyleDayOfWeek]
 ///
 ///
-
-///
-/// TODO: let each cell type as a layer in a single date cell stack
-///
-enum CalendarCellType {
-  disabled,
-  today,
-  focused,
-  weekend,
-  weekday,
-  holiday,
-  outside,
-}
 
 ///
 ///
@@ -93,7 +78,7 @@ class CalendarStyleHeader {
     required PageController pageController,
     required CalendarStyle style,
     required dynamic locale,
-    required ValueNotifier<int> weeksPerPage,
+    required ValueNotifier<int> pageWeeks,
     required ValueChanged<int> updateFormatIndex,
   }) {
     final buildFormatButton = styleFormatButton?.builderFrom(
@@ -115,7 +100,7 @@ class CalendarStyleHeader {
               curve: style.pagingCurve,
             ),
           buildTitle(focusedDate, locale),
-          if (buildFormatButton != null) buildFormatButton(weeksPerPage),
+          if (buildFormatButton != null) buildFormatButton(pageWeeks),
           if (buildChevron != null)
             buildChevron(
               DirectionIn4.right,

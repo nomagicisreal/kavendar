@@ -1,16 +1,60 @@
 part of '../table_calendar.dart';
 
 ///
+/// [CalendarCellType]
+/// [CalendarCell]
+/// [CalendarStyleCellStack]
+/// [CalendarStyleCellStackOverlay]
+/// [CalendarStyleCellStackBackground]
 ///
-/// [CalendarStyleCellOverlay]
-/// [CalendarStyleCellBackground]
 ///
-///
+
+enum CalendarCellType {
+  disabled,
+  today,
+  focused,
+  holiday,
+  outside,
+  normal,
+}
+
+
+typedef CalendarCell =
+    (
+      CalendarCellType,
+      // cell decoration: shape, background color, border color
+      (BoxShape, MaterialColorRole, MaterialColorRole?),
+      // text style: theme, color, emphasis level
+      (MaterialTextTheme, MaterialColorRole, MaterialEmphasisLevel),
+    );
 
 ///
 ///
 ///
-class CalendarStyleCellOverlay {
+class CalendarStyleCellStack {
+  final AlignmentGeometry cellStackAlignment;
+  final Clip cellStackClip;
+  final CalendarStyleCellStackOverlay styleOverlay;
+  final CalendarStyleCellStackBackground? styleBackground;
+
+  const CalendarStyleCellStack({
+    this.cellStackAlignment = Alignment.bottomCenter,
+    this.cellStackClip = Clip.none,
+    this.styleOverlay = const CalendarStyleCellStackOverlay(),
+    this.styleBackground,
+  });
+
+  Widget _build(List<Widget> children) => Stack(
+    alignment: cellStackAlignment,
+    clipBehavior: cellStackClip,
+    children: children,
+  );
+}
+
+///
+///
+///
+class CalendarStyleCellStackOverlay {
   final int markMax;
   final double? markSize;
   final double markSizeScale;
@@ -20,7 +64,7 @@ class CalendarStyleCellOverlay {
   final Decoration markDecoration;
   final PositionedLayout? _markLayout;
 
-  const CalendarStyleCellOverlay({
+  const CalendarStyleCellStackOverlay({
     this.markMax = 4,
     this.markSize,
     this.markSizeScale = 0.2,
@@ -37,7 +81,7 @@ class CalendarStyleCellOverlay {
   ///
   ///
   ///
-  static PositionedLayout _layoutFrom(CalendarStyleCellOverlay style) => (
+  static PositionedLayout _layoutFrom(CalendarStyleCellStackOverlay style) => (
     constraints,
   ) {
     final shorterSide = FBoxConstraints.shortSide(constraints);
@@ -60,7 +104,7 @@ class CalendarStyleCellOverlay {
   ///
   ///
   static EventSingleBuilder<T> _singleDecoration<T>(
-    CalendarStyleCellOverlay style,
+    CalendarStyleCellStackOverlay style,
   ) =>
       (day, event) => Container(
         width: style.markSize,
@@ -69,7 +113,9 @@ class CalendarStyleCellOverlay {
         decoration: style.markDecoration,
       );
 
-  static EventsBuilder<T> _allPositionedRow<T>(CalendarStyleCellOverlay style) {
+  static EventsBuilder<T> _allPositionedRow<T>(
+    CalendarStyleCellStackOverlay style,
+  ) {
     final layout = style.layout;
     return (constraints, dateTime, events, mark) {
       if (events.isEmpty) return null;
@@ -108,7 +154,7 @@ class CalendarStyleCellOverlay {
 ///
 ///
 ///
-class CalendarStyleCellBackground {
+class CalendarStyleCellStackBackground {
   final HighlightWidthFrom<CalendarStyle> widthFrom;
   final OnRangeSelected? onRangeSelected;
 
@@ -124,7 +170,7 @@ class CalendarStyleCellBackground {
   final TextStyle rangeWithinTextStyle;
   final Decoration rangeWithinDecoration;
 
-  const CalendarStyleCellBackground({
+  const CalendarStyleCellStackBackground({
     ///
     ///
     ///
@@ -164,7 +210,7 @@ class CalendarStyleCellBackground {
   ///
   static ConstraintsRangeBuilder _backgroundHighlight(
     CalendarStyle style,
-    CalendarStyleCellBackground styleRange,
+    CalendarStyleCellStackBackground styleRange,
   ) {
     final doubleFrom = styleRange.widthFrom(style);
     return (s, constraints) => Center(

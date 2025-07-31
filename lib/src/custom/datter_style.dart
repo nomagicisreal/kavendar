@@ -6,16 +6,11 @@ import 'datter.dart';
 
 ///
 ///
+/// [DefaultTextStyle]
 /// [StyleTextButton]
+/// [StyleChevrons]
 ///
 ///
-
-class DecorationTextStyle {
-  final Decoration? decoration;
-  final TextStyle? textStyle;
-
-  const DecorationTextStyle(this.decoration, this.textStyle);
-}
 
 ///
 ///

@@ -2,7 +2,7 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [_CalendarFocus]
+/// [CalendarFocus]
 /// [_CalendarFocusParent]
 ///   [_CalendarFocusOnly]
 ///   [_CalendarFocusSelection]
@@ -10,30 +10,32 @@ part of '../table_calendar.dart';
 ///
 ///
 
+typedef CalendarFocusInitializer = CalendarFocus Function(DateTime dateFocused);
+
 ///
-/// [_CalendarFocus] is a class handle date cell gesture
+/// [CalendarFocus] is a class handle date cell gesture
 /// normal date  -> focused date -> selected date
 ///
-abstract base class _CalendarFocus {
+abstract base class CalendarFocus {
   DateTime get dateFocused;
 
   set dateFocused(DateTime value);
 
-  const _CalendarFocus._();
+  const CalendarFocus._();
 
   ///
   ///
   ///
-  factory _CalendarFocus(Calendar widget) {
+  factory CalendarFocus(Calendar widget) {
     final style = widget.style;
     final dateFocused = widget.focusedDate ?? DateTime.now().dateOnly;
-    if (style.styleCellBackground == null) {
-      return _CalendarFocusOnly(dateFocused);
-    } else {
-      return _CalendarFocusSelection(dateFocused);
-    }
-    // throw UnimplementedError();
+    return style.focusInitializer(dateFocused);
   }
+
+  factory CalendarFocus.onlyFocus(DateTime dateFocused) = _CalendarFocusOnly;
+
+  factory CalendarFocus.withSelection(DateTime dateFocused) =
+      _CalendarFocusSelection;
 
   VoidCallback onFocusDate(
     ListenListener setState,
@@ -69,7 +71,7 @@ abstract base class _CalendarFocus {
   bool _newFocus(ListenListener setState, DateTime date);
 }
 
-abstract base class _CalendarFocusParent extends _CalendarFocus {
+abstract base class _CalendarFocusParent extends CalendarFocus {
   @override
   DateTime dateFocused;
 
@@ -99,7 +101,9 @@ base class _CalendarFocusSelection extends _CalendarFocusParent {
   /// [_dateSelected], [readyToRangePeriod]
   /// [_unselect], [unselectAll]
   ///
-  NodeNextSorted<DateTime>? _dateSelected; // todo: sorted identical set
+  /// todo: sorted identical set
+  ///
+  NodeNextSorted<DateTime>? _dateSelected;
   bool readyToRangePeriod = false;
 
   void _unselect(DateTime date) {

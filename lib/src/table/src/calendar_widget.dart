@@ -39,16 +39,7 @@ class Calendar<T> extends StatefulWidget {
          if (domain == null) return true;
          return focusedDate.isAfter(domain.start) &&
              focusedDate.isBefore(domain.end);
-       }(), 'focusedDay($focusedDate) must between domain(${style.domain})'),
-       assert(() {
-         final weekend = style.predicateWeekend;
-         final weekday = style.predicateWeekday;
-         var date = DateTime.now();
-         for (var i = 0; i < 7; i++) {
-           if (weekend(date) == weekday(date)) return false;
-         }
-         return true;
-       }());
+       }(), 'focusedDay($focusedDate) must between domain(${style.domain})');
 
   @override
   State<Calendar<T>> createState() => _CalendarState<T>();
@@ -68,7 +59,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
 
   late double _cellHeight;
   late DateTimeRange _domain;
-  late _CalendarFocus _focus;
+  late CalendarFocus _focus;
   late IndexingDate _paging;
   late CalendarStyle _style;
   late TableRowsBuilder _tableBuilder;
@@ -89,7 +80,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
   @override
   void initState() {
     super.initState();
-    _focus = _CalendarFocus(widget);
+    _focus = CalendarFocus(widget);
     final dateFocused = _focus.dateFocused;
     final style = widget.style;
     final domain = style.domain(dateFocused);
@@ -105,15 +96,12 @@ class _CalendarState<T> extends State<Calendar<T>> {
     _pageController = style.pageControllerInitializer(domain, wPP, dateFocused);
     _indexPrevious = _pageController.initialPage;
     _paging = style._pageFirstDateFrom(domainStart, domainEnd, wPP);
-    _builder = style._initColumnBuilder(
-      headerBuilder: style.styleHeader?.initBuilder(
-        pageController: _pageController,
-        style: style,
-        locale: widget.locale,
-        weeksPerPage: _pageWeeks,
-        updateFormatIndex: _updateFormatIndex,
-      ),
+    _builder = style._initCalendarBuilder(
       bodyLayout: _layout,
+      pageController: _pageController,
+      locale: widget.locale,
+      pageWeeks: _pageWeeks,
+      updateFormatIndex: _updateFormatIndex,
     );
   }
 
@@ -182,67 +170,98 @@ class _CalendarState<T> extends State<Calendar<T>> {
     return date.isBefore(domain.start) || date.isAfter(domain.end);
   }
 
-  ///
-  /// [_layout]
-  /// [_layoutPage]
-  ///
-  DateBuilder get _initDateBuilder {
+  DateBuilder get _dateBuilder {
     final style = _style;
-    final cellSetup = style.cellSetup;
-    final cellHitTestBehavior = style.cellHitTestBehavior;
-    final configuration = {
-      CalendarCellType.disabled: style.predicateDisable,
-      CalendarCellType.holiday: style.predicateHoliday,
-      CalendarCellType.weekend: style.predicateWeekend,
-      CalendarCellType.weekday: style.predicateWeekday,
-      CalendarCellType.focused: _predicateFocused,
-      CalendarCellType.outside: _predicateOutside,
-      CalendarCellType.today: DTExt.predicateToday,
-    };
+    final prioritization = style.cellPrioritization.mapToList((item) {
+      final type = item.$1;
+      final predicator = switch (type) {
+        CalendarCellType.disabled => style.predicateDisable,
+        CalendarCellType.holiday => style.predicateHoliday,
+        CalendarCellType.focused => _predicateFocused,
+        CalendarCellType.outside => _predicateOutside,
+        CalendarCellType.today => DTExt.predicateToday,
+        CalendarCellType.normal => null,
+      };
+      final decoration = item.$2;
+      final textStyle = item.$3;
+      return (
+        predicator,
+        type,
+        MaterialStyle.builderDecoration(
+          shape: decoration.$1,
+          backgroundColor: decoration.$2,
+          borderColor: decoration.$3,
+        ),
+        MaterialStyle.builderTextStyle(
+          theme: textStyle.$1,
+          styleColor: textStyle.$2,
+          styleAlpha: textStyle.$3,
+        ),
+      );
+    });
     final buildCellStack = style._initCellStackBuilder(
       eventLoader: widget.eventLoader,
       eventsLayoutMark: widget.eventsLayoutMark,
       eventLayoutSingleMark: widget.eventLayoutSingleMark,
     );
     final buildCell = style._buildCell;
+
+    // gesture
+    final onTap = _focus.onFocusDate;
+    final hitTestBehavior = style.cellHitTestBehavior;
+    final onDateFocused = style.onDateFocused;
+    Widget active({
+      required bool isDisable,
+      required DateTime date,
+      required Widget child,
+    }) =>
+        isDisable
+            ? child
+            : GestureDetector(
+              behavior: hitTestBehavior,
+              onTap: onTap(setState, date, onDateFocused),
+              child: child,
+            );
     return (date) {
-      Widget? child;
-      if (!_predicateBlocked(date)) {
-        for (var current in cellSetup) {
-          final cellType = current.$1;
-          final predicate = configuration[cellType]!;
-          if (!predicate(date)) continue;
-          child = LayoutBuilder(
+      if (_predicateBlocked(date)) return _layoutCell(null);
+      for (var current in prioritization) {
+        final predicate = current.$1;
+        if (predicate != null && !predicate(date)) continue;
+        final cellType = current.$2;
+        return _layoutCell(
+          LayoutBuilder(
             builder: (context, constraints) {
-              final child = buildCellStack(
-                date,
-                _focus.dateFocused,
-                cellType,
-                constraints,
-                buildCell(date, widget.locale, current.$2),
+              return active(
+                isDisable: cellType == CalendarCellType.disabled,
+                date: date,
+                child: buildCellStack(
+                  date,
+                  _focus.dateFocused,
+                  cellType,
+                  constraints,
+                  buildCell(
+                    date,
+                    widget.locale,
+                    current.$3(context),
+                    current.$4(context),
+                  ),
+                ),
               );
-              return cellType == CalendarCellType.disabled
-                  ? child
-                  : GestureDetector(
-                    behavior: cellHitTestBehavior,
-                    onTap: _focus.onFocusDate(
-                      setState,
-                      date,
-                      style.onDateFocused,
-                    ),
-                    child: child,
-                  );
             },
-          );
-          break;
-        }
-        if (child == null) {
-          throw StateError('unknown builder for date($date)');
-        }
+          ),
+        );
       }
-      return SizedBox(height: _cellHeight, child: child);
+      throw StateError('unknown cell type for date:$date');
     };
   }
+
+  ///
+  /// [_layoutCell]
+  /// [_layout]
+  /// [_layoutPage]
+  ///
+  Widget _layoutCell(Widget? child) =>
+      SizedBox(height: _cellHeight, child: child);
 
   Widget _layoutPage(IndexedWidgetBuilder itemBuilder) =>
       ValueListenableBuilder<double>(
@@ -264,14 +283,14 @@ class _CalendarState<T> extends State<Calendar<T>> {
       _constraintsBody = constraints;
       final height = style._heightBody(constraints) / weeksPerPage;
       _cellHeight = height;
-      _tableBuilder = style._initTableBuilder(
+      _tableBuilder = style._initTableRowsBuilder(
         widget.locale,
         height,
         _predicateBlocked,
       );
     }
     final tableBuilder = _tableBuilder;
-    final dateBuilder = _initDateBuilder;
+    final dateBuilder = _dateBuilder;
     final firstDateOfPage = _paging;
     final datesPerPage = DateTime.daysPerWeek * weeksPerPage;
     return _layoutPage(

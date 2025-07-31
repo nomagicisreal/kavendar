@@ -76,12 +76,12 @@ typedef EventLoader<T> = List<T> Function(DateTime date);
 typedef EventElementMark<T> =
     EventSingleBuilder<T> Function(
       BoxConstraints constraints,
-      CalendarStyleCellOverlay style,
+      CalendarStyleCellStackOverlay style,
     );
 typedef EventsLayoutMark<T> =
     EventsBuilder<T> Function(
       BoxConstraints constraints,
-      CalendarStyleCellOverlay style,
+      CalendarStyleCellStackOverlay style,
     );
 
 ///
