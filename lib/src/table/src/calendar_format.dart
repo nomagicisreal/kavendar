@@ -8,10 +8,22 @@ part of '../table_calendar.dart';
 /// [EventSingleBuilder], ...
 ///
 ///
+
+///
+/// [PageController.animateTo]
+/// [PageController.animateToPage]
+/// [PageController.previousPage]
+/// [PageController.nextPage]
+///
+typedef AnimateToFutureRequired = Future<void> Function(
+    {required Duration duration, required Curve curve});
+
+
+///
+///
+///
 typedef OnPageChanged =
     void Function(int index, int indexPrevious, DateTime focusedDate);
-
-typedef OnDateChanged = void Function(DateTime date, DateTime datePrevious);
 
 typedef OnRangeSelected =
     void Function(DateTime? start, DateTime? end, DateTime focusedDate);

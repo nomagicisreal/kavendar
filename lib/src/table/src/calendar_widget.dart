@@ -3,8 +3,6 @@ part of '../table_calendar.dart';
 ///
 ///
 /// [Calendar]
-/// [VerticalDragIndexing]
-/// [_TableCalendarRange]
 ///
 ///
 class Calendar<T> extends StatefulWidget {
@@ -16,6 +14,7 @@ class Calendar<T> extends StatefulWidget {
   ///
   ///
   final CalendarStyle style;
+  final Intersector<DateTime>? onNewDateFocused;
   final EventsLayoutMark<T>? eventsLayoutMark;
   final EventElementMark<T>? eventLayoutSingleMark;
   final EventLoader<T>? eventLoader;
@@ -23,9 +22,12 @@ class Calendar<T> extends StatefulWidget {
   Calendar({
     super.key,
     this.locale,
-    this.style = const CalendarStyle(),
     this.focusedDate,
     this.weeksPerPage = CalendarStyle.weeksPerPage_6,
+
+    //
+    this.style = const CalendarStyle(),
+    this.onNewDateFocused,
     this.eventsLayoutMark,
     this.eventLayoutSingleMark,
     this.eventLoader,
@@ -60,7 +62,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
   late double _cellHeight;
   late DateTimeRange _domain;
   late CalendarFocus _focus;
-  late IndexingDate _paging;
+  late Generator<DateTime> _paging;
   late CalendarStyle _style;
   late TableRowsBuilder _tableBuilder;
   late DateBuilder _builder;
@@ -143,7 +145,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
     if (next != null) _focus.dateFocused = next;
 
     _indexPrevious = index;
-    style.onPageChanged?.call(index, indexPrevious, next ?? _focus.dateFocused);
+    style.pageOnChanged?.call(index, indexPrevious, next ?? _focus.dateFocused);
   }
 
   void _updateFormatIndex(int index) {
@@ -156,15 +158,9 @@ class _CalendarState<T> extends State<Calendar<T>> {
   }
 
   ///
-  /// [_predicateFocused]
-  /// [_predicateOutside]
   /// [_predicateBlocked]
+  /// [_dateBuilder]
   ///
-  bool _predicateFocused(DateTime date) => date.isSameDate(_focus.dateFocused);
-
-  bool _predicateOutside(DateTime date) =>
-      date.month != _focus.dateFocused.month;
-
   bool _predicateBlocked(DateTime date) {
     final domain = _domain;
     return date.isBefore(domain.start) || date.isAfter(domain.end);
@@ -172,33 +168,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
 
   DateBuilder get _dateBuilder {
     final style = _style;
-    final prioritization = style.cellPrioritization.mapToList((item) {
-      final type = item.$1;
-      final predicator = switch (type) {
-        CalendarCellType.disabled => style.predicateDisable,
-        CalendarCellType.holiday => style.predicateHoliday,
-        CalendarCellType.focused => _predicateFocused,
-        CalendarCellType.outside => _predicateOutside,
-        CalendarCellType.today => DTExt.predicateToday,
-        CalendarCellType.normal => null,
-      };
-      final decoration = item.$2;
-      final textStyle = item.$3;
-      return (
-        predicator,
-        type,
-        MaterialStyle.builderDecoration(
-          shape: decoration.$1,
-          backgroundColor: decoration.$2,
-          borderColor: decoration.$3,
-        ),
-        MaterialStyle.builderTextStyle(
-          theme: textStyle.$1,
-          styleColor: textStyle.$2,
-          styleAlpha: textStyle.$3,
-        ),
-      );
-    });
+    final prioritization = style.cellPrioritizeWith(_focus._predicators);
     final buildCellStack = style._initCellStackBuilder(
       eventLoader: widget.eventLoader,
       eventsLayoutMark: widget.eventsLayoutMark,
@@ -209,7 +179,6 @@ class _CalendarState<T> extends State<Calendar<T>> {
     // gesture
     final onTap = _focus.onFocusDate;
     final hitTestBehavior = style.cellHitTestBehavior;
-    final onDateFocused = style.onDateFocused;
     Widget active({
       required bool isDisable,
       required DateTime date,
@@ -219,7 +188,7 @@ class _CalendarState<T> extends State<Calendar<T>> {
             ? child
             : GestureDetector(
               behavior: hitTestBehavior,
-              onTap: onTap(setState, date, onDateFocused),
+              onTap: onTap(setState, date),
               child: child,
             );
     return (date) {

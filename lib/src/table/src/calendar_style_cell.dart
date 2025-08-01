@@ -2,7 +2,7 @@ part of '../table_calendar.dart';
 
 ///
 /// [CalendarCellType]
-/// [CalendarCell]
+/// [CalendarFocusStyle]
 /// [CalendarStyleCellStack]
 /// [CalendarStyleCellStackOverlay]
 /// [CalendarStyleCellStackBackground]
@@ -13,19 +13,22 @@ enum CalendarCellType {
   disabled,
   today,
   focused,
-  holiday,
   outside,
+  selected,
+  readyToAction,
+  holiday,
   normal,
 }
 
+typedef CalendarFocusStyle =
+    (CalendarCellType, MaterialDecoration?, MaterialTextStyle?);
 
-typedef CalendarCell =
+typedef CalendarCellBuilder =
     (
+      Predicator<DateTime>?,
       CalendarCellType,
-      // cell decoration: shape, background color, border color
-      (BoxShape, MaterialColorRole, MaterialColorRole?),
-      // text style: theme, color, emphasis level
-      (MaterialTextTheme, MaterialColorRole, MaterialEmphasisLevel),
+      ContextGeneral<Decoration>,
+      ContextGeneral<TextStyle>,
     );
 
 ///
@@ -163,11 +166,6 @@ class CalendarStyleCellStackBackground {
   ///
   final double highlightScale;
   final Color highlightColor;
-  final TextStyle rangeStartTextStyle;
-  final Decoration rangeStartDecoration;
-  final TextStyle rangeEndTextStyle;
-  final Decoration rangeEndDecoration;
-  final TextStyle rangeWithinTextStyle;
   final Decoration rangeWithinDecoration;
 
   const CalendarStyleCellStackBackground({
@@ -176,25 +174,6 @@ class CalendarStyleCellStackBackground {
     ///
     this.highlightScale = 1.0,
     this.highlightColor = const Color(0xFFBBDDFF),
-
-    // todo: move to calendar cell type?
-    this.rangeStartTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeStartDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.rangeEndTextStyle = const TextStyle(
-      color: Color(0xFFFAFAFA),
-      fontSize: 16.0,
-    ),
-    this.rangeEndDecoration = const BoxDecoration(
-      color: Color(0xFF6699FF),
-      shape: BoxShape.circle,
-    ),
-    this.rangeWithinTextStyle = const TextStyle(),
     this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
     this.onRangeSelected,
 

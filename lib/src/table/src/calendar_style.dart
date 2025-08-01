@@ -13,7 +13,6 @@ part of '../table_calendar.dart';
 ///
 class CalendarStyle {
   final DateTimeFormatter dateTextFormatter;
-  final CalendarFocusInitializer focusInitializer;
   final int verticalFlex;
   final FlexFit verticalFlexFit;
   final ScrollPhysics? horizontalScroll;
@@ -29,9 +28,14 @@ class CalendarStyle {
   final Duration formatAnimationDuration;
   final Curve formatAnimationCurve;
   final CalendarPageNext? formatPagingToWhere;
+
+  ///
+  ///
+  ///
   final Duration pagingDuration;
   final Curve pagingCurve;
   final CalendarPageControllerInitializer pageControllerInitializer;
+  final OnPageChanged? pageOnChanged;
 
   ///
   ///
@@ -44,7 +48,6 @@ class CalendarStyle {
   ///
   ///
   ///
-  final List<CalendarCell> cellPrioritization;
   final HitTestBehavior cellHitTestBehavior;
   final EdgeInsets cellMargin;
   final EdgeInsets cellPadding;
@@ -58,17 +61,12 @@ class CalendarStyle {
   ///
   ///
   ///
-  final Predicator<DateTime> predicateDisable;
-  final Predicator<DateTime> predicateHoliday;
-  final Predicator<DateTime> predicateWeekend;
-  final OnDateChanged? onDateFocused;
-  final OnPageChanged? onPageChanged;
-  final void Function(PageController pageController)? onInitState;
+  final CalendarFocusInitializer focusInitializer;
+  final List<CalendarFocusStyle> focusStyle;
+  final CalendarFocusStyle focusStyleDefault;
 
   const CalendarStyle({
     this.dateTextFormatter = _dateTextFormater,
-    // this.focusInitializer = CalendarFocus.withSelection,
-    this.focusInitializer = CalendarFocus.onlyFocus,
     this.verticalFlex = 1, // 1 expand, 0 shrink
     this.verticalFlexFit = FlexFit.loose,
     this.horizontalScroll = const PageScrollPhysics(),
@@ -82,9 +80,12 @@ class CalendarStyle {
     this.formatPagingToWhere,
     this.formatAnimationDuration = DurationExtension.milli200,
     this.formatAnimationCurve = Curves.linear,
+
+    //
     this.pagingDuration = DurationExtension.milli300,
     this.pagingCurve = Curves.easeOut,
     this.pageControllerInitializer = _pageController,
+    this.pageOnChanged,
 
     //
     this.styleHeader = const CalendarStyleHeader(),
@@ -104,76 +105,13 @@ class CalendarStyle {
     this.cellPadding = EdgeInsets.zero,
     this.cellAlignment = Alignment.center,
     this.cellAnimationDuration = Durations.medium1,
-    this.cellPrioritization = const [
-      (
-        CalendarCellType.disabled,
-        (BoxShape.circle, MaterialColorRole.transparent, null),
-        (
-          MaterialTextTheme.bodyMedium,
-          MaterialColorRole.onSurface,
-          MaterialEmphasisLevel.inactive,
-        ),
-      ),
-      (
-        CalendarCellType.focused,
-        (BoxShape.circle, MaterialColorRole.primary, null),
-        (
-          MaterialTextTheme.bodyLarge,
-          MaterialColorRole.onPrimary,
-          MaterialEmphasisLevel.primary,
-        ),
-      ),
-      (
-        CalendarCellType.outside,
-        (BoxShape.circle, MaterialColorRole.surface, null),
-        (
-          MaterialTextTheme.bodyMedium,
-          MaterialColorRole.onSurface,
-          MaterialEmphasisLevel.interactive,
-        ),
-      ),
-      (
-        CalendarCellType.holiday,
-        (
-          BoxShape.circle,
-          MaterialColorRole.surface,
-          MaterialColorRole.outlineVariant,
-        ),
-        (
-          MaterialTextTheme.bodyMedium,
-          MaterialColorRole.onSurface,
-          MaterialEmphasisLevel.primary,
-        ),
-      ),
-      (
-        CalendarCellType.today,
-        (BoxShape.circle, MaterialColorRole.surface, MaterialColorRole.outline),
-        (
-          MaterialTextTheme.bodyLarge,
-          MaterialColorRole.onSurface,
-          MaterialEmphasisLevel.primary,
-        ),
-      ),
-      (
-        CalendarCellType.normal,
-        (BoxShape.circle, MaterialColorRole.surface, null),
-        (
-          MaterialTextTheme.bodyMedium,
-          MaterialColorRole.onSurface,
-          MaterialEmphasisLevel.primary,
-        ),
-      ),
-    ],
 
-    ///
-    ///
-    ///
-    this.predicateDisable = DTExt.predicateFalse,
-    this.predicateHoliday = DTExt.predicateFalse,
-    this.predicateWeekend = DTExt.predicateWeekend,
-    this.onDateFocused,
-    this.onPageChanged,
-    this.onInitState,
+    //
+    // this.focusInitializer = CalendarFocus.focusOnly,
+    // this.focusStyle = CalendarFocus.pFocusOnly,
+    this.focusInitializer = CalendarFocus.focusAndSelection,
+    this.focusStyle = CalendarFocus.pFocusAndSelection,
+    this.focusStyleDefault = CalendarFocus.styleDefault,
   }) : _tableColumnWidth = tableColumnWidth;
 
   ///
@@ -205,16 +143,74 @@ class CalendarStyle {
 
   ///
   /// [domain]
+  /// [cellPrioritizeWith]
   /// [tableColumnWidth]
   ///
   DateTimeRange domain([DateTime? focusedDate]) {
     final domain = formatDomain;
     if (domain != null) return domain;
-    return DTRExt.scopeMonthsFrom(
+    return DateTimeRangeExtension.scopeMonthsFrom(
       (focusedDate ?? DateTime.now()).dateOnly,
       before: 3,
       after: 3,
     );
+  }
+
+  List<CalendarCellBuilder> cellPrioritizeWith(
+    Map<CalendarCellType, Predicator<DateTime>?> predicators,
+  ) {
+    if (predicators.length != focusStyle.length + 1) {
+      throw ArgumentError(
+        'predicators (${predicators.length}) '
+        'not corresponding to '
+        'prioritization (${focusStyle.length})',
+      );
+    }
+
+    //
+    final decorationDefault = focusStyleDefault.$2!;
+    final dBoxShape = decorationDefault.$1!;
+    final dBorderRadius = decorationDefault.$2;
+    final dBoxShadow = decorationDefault.$3;
+    final dGradient = decorationDefault.$4;
+    final dBlendMode = decorationDefault.$5;
+    final dColorEmphasis = decorationDefault.$6!;
+    final dBackgroundColor = dColorEmphasis.$1!;
+    final dBackgroundEmphasis = dColorEmphasis.$2!;
+    final dBorder = decorationDefault.$7;
+    final textStyleDefault = focusStyleDefault.$3!;
+    final tTheme = textStyleDefault.$1!;
+    final tStyleColor = textStyleDefault.$2!;
+    final tStyleAlpha = textStyleDefault.$3!;
+
+    CalendarCellBuilder contexting(CalendarFocusStyle p) {
+      final type = p.$1;
+      final decoration = p.$2;
+      final textStyle = p.$3;
+      final background = decoration?.$6;
+      return (
+        predicators[type],
+        type,
+        FContexting.decorationBox(
+          shape: decoration?.$1 ?? dBoxShape,
+          borderRadius: decoration?.$2 ?? dBorderRadius,
+          boxShadow: decoration?.$3 ?? dBoxShadow,
+          gradient: decoration?.$4 ?? dGradient,
+          blendMode: decoration?.$5 ?? dBlendMode,
+          background: background?.$1 ?? dBackgroundColor,
+          backgroundEmphasis: background?.$2 ?? dBackgroundEmphasis,
+          border: decoration?.$7 ?? dBorder,
+        ),
+        Contexting.textStyle(
+          theme: textStyle?.$1 ?? tTheme,
+          styleColor: textStyle?.$2 ?? tStyleColor,
+          styleAlpha: textStyle?.$3 ?? tStyleAlpha,
+        ),
+      );
+    }
+
+    //
+    return [...focusStyle.mapToList(contexting), contexting(focusStyleDefault)];
   }
 
   Map<int, TableColumnWidth>? get tableColumnWidth =>
@@ -251,12 +247,12 @@ class CalendarStyle {
     }
   }
 
-  IndexingDate _pageFirstDateFrom(
+  Generator<DateTime> _pageFirstDateFrom(
     DateTime domainStart,
     DateTime domainEnd,
     int weeksPerPage,
   ) => switch (weeksPerPage) {
-    weeksPerPage_6 => DTExt.daysToDateClampFrom(
+    weeksPerPage_6 => DateTimeExtension.daysToDateClampFrom(
       domainStart,
       domainEnd,
       startingWeekday: formatStartingWeekday,
@@ -411,7 +407,6 @@ class CalendarStyle {
 
     final styleDayOfWeek = this.styleDayOfWeek;
     final rowHead = styleDayOfWeek?.buildFrom(
-      predicateWeekend: predicateWeekend,
       locale: locale,
       weekNumberTitle: styleWeekNumber?.buildTitle(styleDayOfWeek.height),
     );

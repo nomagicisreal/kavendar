@@ -1,98 +1,91 @@
 import 'package:damath/damath.dart';
 import 'package:datter/datter.dart';
 import 'package:flutter/material.dart';
-import 'package:kavendar/kavendar.dart';
-import 'package:kavendar/src/custom/damath.dart';
 
 ///
-/// remove [printThis]
-/// update all DateTime utc functions to normal construction, utc must named with utc
 ///
-typedef ConstraintsDateBuilder =
-    Widget Function(BoxConstraints constraints, DateTime date);
+///
 
-typedef ConstraintsDateCellTypeBuilder =
-    Widget? Function(
-      BoxConstraints constraints,
-      DateTime date,
-      CalendarCellType cellType,
+///
+///
+/// [FContexting], (update with [Contexting.decoration])
+/// [VerticalDragIndexing]
+///
+///
+///
+
+// theme, color, emphasis level
+typedef MaterialTextStyle =
+    (MaterialTextTheme?, MaterialColorRole?, MaterialEmphasisLevel?);
+
+typedef MaterialColorEmphasis = (MaterialColorRole?, MaterialEmphasisLevel?);
+
+typedef MaterialBorderStyle =
+    (MaterialColorEmphasis?, double?, BorderStyle?, double?);
+
+// cell decoration: shape, background color, border color
+typedef MaterialDecoration =
+    (
+      BoxShape?,
+      BorderRadius?,
+      List<BoxShadow>?,
+      Gradient?,
+      BlendMode?,
+      MaterialColorEmphasis?,
+      MaterialBorderStyle?,
     );
 
-typedef NotifierBuilder<T> = Widget Function(ValueNotifier<T> notifier);
+///
+///
+///
+extension FContexting on ContextGeneral {
+  static ContextGeneral<Decoration> decorationBox({
+    required BoxShape shape,
+    required BorderRadius? borderRadius,
+    required List<BoxShadow>? boxShadow,
+    required Gradient? gradient,
+    required BlendMode? blendMode,
+    required MaterialColorRole background,
+    required MaterialEmphasisLevel backgroundEmphasis,
+    required MaterialBorderStyle? border,
+  }) {
+    final backgroundColor = background.buildColor;
+    final backgroundColorAlpha = backgroundEmphasis.value;
+    if (border == null) {
+      return (context) => BoxDecoration(
+        color: backgroundColor(context).withAlpha(backgroundColorAlpha),
+        shape: shape,
+        borderRadius: borderRadius,
+        boxShadow: boxShadow,
+        gradient: gradient,
+        backgroundBlendMode: blendMode,
+      );
+    }
 
-///
-///
-///
-typedef PageStepper =
-Future<void> Function({required Duration duration, required Curve curve});
-
-typedef PageStepperBuilder = Widget Function(PageStepper stepper);
-
-///
-/// remove StylePositionedLayout
-///
-typedef PositionedLayout =
-    Positioned4Double Function(BoxConstraints constraints);
-
-///
-///
-/// DateTimeExtension static to instance
-///
-///
-extension DTRExt on DateTimeRange {
-  DateTimeRange get normalized => DateTimeRange(start: start.normalized, end: end.normalized);
-
-  ///
-  /// [scopeFrom], [scopeMonthsFrom]
-  ///
-  static DateTimeRange scopeFrom(
-    DateTime date, {
-    int yearsBefore = 0,
-    int monthsBefore = 0,
-    int daysBefore = 0,
-    int hoursBefore = 0,
-    int minutesBefore = 0,
-    int secondsBefore = 0,
-    int yearsAfter = 0,
-    int monthsAfter = 0,
-    int daysAfter = 0,
-    int hoursAfter = 0,
-    int minutesAfter = 0,
-    int secondsAfter = 0,
-  }) => DateTimeRange(
-    start: date.plus(
-      year: -yearsBefore,
-      month: -monthsBefore,
-      day: -daysBefore,
-      hour: -hoursBefore,
-      minute: -minutesBefore,
-      second: -secondsBefore,
-    ),
-    end: date.plus(
-      year: yearsAfter,
-      month: monthsAfter,
-      day: daysAfter,
-      hour: hoursAfter,
-      minute: minutesAfter,
-      second: secondsAfter,
-    ),
-  );
-
-  static DateTimeRange scopeMonthsFrom(
-    DateTime date, {
-    int before = 0,
-    int after = 0,
-  }) => DateTimeRange(
-    start: date.plus(month: -before).firstDateOfMonth,
-    end: date.plus(month: after).lastDateOfMonth,
-  );
-
-  ///
-  ///
-  ///
-  bool contains(DateTime dateTime, [bool inclusive = true]) =>
-      (dateTime.isAfter(start) && dateTime.isBefore(end)) ||
-      (!inclusive || dateTime.isSameDate(start) || dateTime.isSameDate(end));
+    //
+    final emphasis = border.$1!;
+    final colorBorder = emphasis.$1!.buildColor;
+    final colorBorderAlpha = emphasis.$2!.value;
+    final width = border.$2!;
+    final style = border.$3!;
+    final strokeAlign = border.$4!;
+    return (context) => BoxDecoration(
+      color: backgroundColor(context),
+      shape: shape,
+      borderRadius: borderRadius,
+      boxShadow: boxShadow,
+      gradient: gradient,
+      backgroundBlendMode: blendMode,
+      border: Border.fromBorderSide(
+        BorderSide(
+          color: colorBorder(context).withAlpha(colorBorderAlpha),
+          width: width,
+          style: style,
+          strokeAlign: strokeAlign,
+        ),
+      ),
+    );
+  }
 }
 
 ///
@@ -100,12 +93,14 @@ extension DTRExt on DateTimeRange {
 ///
 class VerticalDragIndexing<T> extends StatefulWidget {
   const VerticalDragIndexing({
+    this.threshold = 25.0,
     required this.notifier,
     required this.availables,
     required this.onNextFormatIndex,
     required this.child,
   });
 
+  final double threshold;
   final ValueNotifier<T> notifier;
   final List<T> availables;
   final ValueChanged<int> onNextFormatIndex;
@@ -119,10 +114,10 @@ class VerticalDragIndexing<T> extends StatefulWidget {
 class _VerticalDragIndexingState<T> extends State<VerticalDragIndexing<T>>
     with GestureDetectorDragMixin<VerticalDragIndexing<T>> {
   Widget _builderVerticalDragAble(
-      BuildContext context,
-      T value,
-      Widget? child,
-      ) {
+    BuildContext context,
+    T value,
+    Widget? child,
+  ) {
     final availables = widget.availables;
     return GestureDetector(
       behavior: HitTestBehavior.deferToChild,
@@ -130,7 +125,7 @@ class _VerticalDragIndexingState<T> extends State<VerticalDragIndexing<T>>
       onVerticalDragUpdate: onDragUpdateFrom(),
       onVerticalDragEnd: onDragEndFrom(
         difference: OffsetExtension.differenceVertical,
-        threshold: 25.0,
+        threshold: widget.threshold,
         direction: DirectionIn4.verticalForward,
         onDrag: FValueChanged.indexingByVerticalDrag(
           onIndex: widget.onNextFormatIndex,

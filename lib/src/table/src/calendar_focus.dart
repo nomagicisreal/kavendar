@@ -4,50 +4,140 @@ part of '../table_calendar.dart';
 ///
 /// [CalendarFocus]
 /// [_CalendarFocusParent]
-///   [_CalendarFocusOnly]
-///   [_CalendarFocusSelection]
+///   [_CalendarFocusFocusOnly]
+///   [_CalendarFocusFocusAndSelection]
 ///
 ///
 ///
 
-typedef CalendarFocusInitializer = CalendarFocus Function(DateTime dateFocused);
+typedef CalendarFocusInitializer =
+    CalendarFocus Function(
+      DateTime dateFocused,
+      Intersector<DateTime>? onNewDateFocused,
+    );
 
 ///
-/// [CalendarFocus] is a class handle date cell gesture
-/// normal date  -> focused date -> selected date
+///
+/// [CalendarFocus.focusOnly], ...
+/// [pFocusOnly], ...
+///
+/// [dateFocused]
+/// [predicateFocused], [predicateOutside]
+/// [_predicators]
 ///
 abstract base class CalendarFocus {
+  const CalendarFocus._();
+
+  factory CalendarFocus(Calendar widget) => widget.style.focusInitializer(
+    (widget.focusedDate ?? DateTime.now()).dateOnly,
+    widget.onNewDateFocused,
+  );
+
+  factory CalendarFocus.focusOnly(
+    DateTime dateFocused,
+    Intersector<DateTime>? onNewDateFocused,
+  ) = _CalendarFocusFocusOnly;
+
+  factory CalendarFocus.focusAndSelection(
+    DateTime dateFocused,
+    Intersector<DateTime>? onNewDateFocused,
+  ) = _CalendarFocusFocusAndSelection;
+
+  ///
+  ///
+  ///
+  static const CalendarFocusStyle styleDefault = (
+    CalendarCellType.normal,
+    (
+      BoxShape.circle,
+      null,
+      null,
+      null,
+      null,
+      (MaterialColorRole.surface, MaterialEmphasisLevel.primary),
+      null,
+    ),
+    (
+      MaterialTextTheme.bodyMedium,
+      MaterialColorRole.onSurface,
+      MaterialEmphasisLevel.primary,
+    ),
+  );
+
+  static const List<CalendarFocusStyle> pFocusOnly = [
+    (
+      CalendarCellType.focused,
+      (null, null, null, null, null, (MaterialColorRole.primary, null), null),
+      (MaterialTextTheme.bodyLarge, MaterialColorRole.onPrimary, null),
+    ),
+    (
+      CalendarCellType.outside,
+      (null, null, null, null, null, (MaterialColorRole.primary, null), null),
+      (null, null, MaterialEmphasisLevel.interactive),
+    ),
+  ];
+
+  static const List<CalendarFocusStyle> pFocusAndSelection = [
+    (
+      CalendarCellType.readyToAction,
+      (null, null, null, null, null, (MaterialColorRole.primary, null), null),
+      (MaterialTextTheme.bodyLarge, MaterialColorRole.onPrimary, null),
+    ),
+    (
+      CalendarCellType.selected,
+      (null, null, null, null, null, (MaterialColorRole.secondary, null), null),
+      (MaterialTextTheme.bodyLarge, MaterialColorRole.onSecondary, null),
+    ),
+    (
+      CalendarCellType.focused,
+      (
+        null,
+        null,
+        null,
+        null,
+        null,
+        (MaterialColorRole.tertiary, MaterialEmphasisLevel.inactive),
+        null,
+      ),
+      (null, MaterialColorRole.onTertiary, null),
+    ),
+    (
+      CalendarCellType.outside,
+      (
+        null,
+        null,
+        null,
+        null,
+        null,
+        (MaterialColorRole.surface, MaterialEmphasisLevel.inactive),
+        null,
+      ),
+      (null, null, MaterialEmphasisLevel.interactive),
+    ),
+  ];
+
+  ///
+  ///
+  ///
   DateTime get dateFocused;
 
   set dateFocused(DateTime value);
 
-  const CalendarFocus._();
+  Map<CalendarCellType, Predicator<DateTime>?> get _predicators;
 
-  ///
-  ///
-  ///
-  factory CalendarFocus(Calendar widget) {
-    final style = widget.style;
-    final dateFocused = widget.focusedDate ?? DateTime.now().dateOnly;
-    return style.focusInitializer(dateFocused);
-  }
+  Intersector<DateTime>? get onNewDateFocused;
 
-  factory CalendarFocus.onlyFocus(DateTime dateFocused) = _CalendarFocusOnly;
+  bool predicateFocused(DateTime date) => date.isSameDate(dateFocused);
 
-  factory CalendarFocus.withSelection(DateTime dateFocused) =
-      _CalendarFocusSelection;
+  bool predicateOutside(DateTime date) => date.month != dateFocused.month;
 
-  VoidCallback onFocusDate(
-    ListenListener setState,
-    DateTime dateFocused,
-    OnDateChanged? onFocusStart,
-  ) => () {
-    if (dateFocused == this.dateFocused) {
+  VoidCallback onFocusDate(Consumer<Callback> setState, DateTime date) => () {
+    if (date == dateFocused) {
       _continueFocus(setState);
       return;
     }
-    if (_newFocus(setState, dateFocused)) {
-      onFocusStart?.call(dateFocused, this.dateFocused);
+    if (_newFocus(setState, date)) {
+      onNewDateFocused?.call(date, dateFocused);
     }
   };
 
@@ -62,88 +152,90 @@ abstract base class CalendarFocus {
   ///
   /// [_continueFocus] is called when tapped date is focused date
   ///
-  void _continueFocus(ListenListener setState);
+  void _continueFocus(Consumer<Callback> setState);
 
   ///
   /// return `true`  when [date] is a new focused date
   /// return `false` when [date] is not a new focused date
   ///
-  bool _newFocus(ListenListener setState, DateTime date);
+  bool _newFocus(Consumer<Callback> setState, DateTime date);
 }
 
 abstract base class _CalendarFocusParent extends CalendarFocus {
   @override
   DateTime dateFocused;
+  @override
+  final Intersector<DateTime>? onNewDateFocused;
+  @override
+  final Map<CalendarCellType, Predicator<DateTime>?> _predicators = {
+    CalendarCellType.normal: null,
+  };
 
-  _CalendarFocusParent(this.dateFocused) : super._();
+  _CalendarFocusParent(this.dateFocused, this.onNewDateFocused) : super._();
 }
 
-base class _CalendarFocusOnly extends _CalendarFocusParent {
-  _CalendarFocusOnly(super.dateFocused);
+///
+///
+///
+base class _CalendarFocusFocusOnly extends _CalendarFocusParent {
+  @override
+  void _continueFocus(Consumer<Callback> setState) {}
 
   @override
-  void _continueFocus(ListenListener setState) {}
-
-  @override
-  bool _newFocus(ListenListener setState, DateTime date) {
+  bool _newFocus(Consumer<Callback> setState, DateTime date) {
     setState(() => dateFocused = date);
     return true;
   }
+
+  ///
+  ///
+  ///
+  _CalendarFocusFocusOnly(super.dateFocused, super.onNewDateFocused) {
+    _predicators
+      ..putIfAbsent(CalendarCellType.focused, () => predicateFocused)
+      ..putIfAbsent(CalendarCellType.outside, () => predicateOutside);
+  }
 }
 
 ///
+/// [_datesSelected], ...
+/// [_continueFocus], ...
+/// [pFocusAndSelection], ...
 ///
 ///
-base class _CalendarFocusSelection extends _CalendarFocusParent {
-  _CalendarFocusSelection(super.dateFocused);
+base class _CalendarFocusFocusAndSelection extends _CalendarFocusFocusOnly {
+  final DatesContainer _datesSelected = DatesContainer.empty();
+  int _rangingDistance = 0;
+
+  bool _predicateFocus(DateTime date) =>
+      _datesSelected.isEmpty && dateFocused == date;
+
+  bool _predicateSelected(DateTime date) => _datesSelected.contains(date);
+
+  bool _predicateReady(DateTime date) =>
+      date == dateFocused &&
+      _datesSelected.contains(date) &&
+      _rangingDistance != 0;
 
   ///
-  /// [_dateSelected], [readyToRangePeriod]
-  /// [_unselect], [unselectAll]
-  ///
-  /// todo: sorted identical set
-  ///
-  NodeNextSorted<DateTime>? _dateSelected;
-  bool readyToRangePeriod = false;
-
-  void _unselect(DateTime date) {
-    if (_dateSelected!.cutFirst(date)) {
-      _dateSelected = _dateSelected?.next;
-    }
-  }
-
-  void unselectAll() {
-    _dateSelected = null;
-    readyToRangePeriod = false;
-  }
-
-  ///
-  /// 1. continue focus to create new selection
-  /// 2. continue focus to add more selection
-  /// 3. continue focus to ready to ranging period selection
-  /// 4. continue focus to cancel current selection
+  /// 1. continue focus to add a selection
+  /// 2. continue focus to ready to ranging period selection, cancel current selection
   ///
   @override
-  void _continueFocus(ListenListener setState) {
-    final dateSelected = _dateSelected;
-
-    if (dateSelected == null) {
-      // 1.
-      _dateSelected = NodeNextSorted.mutable(dateFocused);
-    } else {
-      if (dateSelected.contains(dateFocused)) {
-        if (readyToRangePeriod) {
-          // 4.
-          _unselect(dateFocused);
-          readyToRangePeriod = false;
-        } else {
-          // 3.
-          readyToRangePeriod = true;
-        }
+  void _continueFocus(Consumer<Callback> setState) {
+    final dateSelected = _datesSelected;
+    if (dateSelected.contains(dateFocused)) {
+      // 2.
+      if (_rangingDistance != 0) {
+        dateSelected.exclude(dateFocused);
+        _rangingDistance = 0;
       } else {
-        // 2.
-        dateSelected.push(dateFocused);
+        // todo: calendar focus ranging distance 2, 7, 10, or even 100
+        _rangingDistance = 1;
       }
+    } else {
+      // 1.
+      dateSelected.include(dateFocused);
     }
     setState(FListener.none);
   }
@@ -156,36 +248,53 @@ base class _CalendarFocusSelection extends _CalendarFocusParent {
   ///   3. [date] and the dates between [date] and [dateFocused] have to be in the selection
   ///
   @override
-  bool _newFocus(ListenListener setState, DateTime date) {
-    //
-    final dateSelected = _dateSelected;
-    if (dateSelected == null) {
-      setState(() => dateFocused = date);
-      return true;
-    }
+  bool _newFocus(Consumer<Callback> setState, DateTime date) {
+    final dateSelected = _datesSelected;
 
-    //
+    // return true
+    if (dateSelected.isEmpty) return super._newFocus(setState, date);
+
+    // return false
     if (dateSelected.contains(date)) {
+      // ready to include dates, not excluding date
+      if (_rangingDistance != 0) return false;
+
       // 1.
-      _unselect(date);
+      dateSelected.exclude(date);
     } else {
-      if (readyToRangePeriod) {
+      if (_rangingDistance != 0) {
         // 3.
-        final range =
+        final selection =
             dateFocused.isBefore(date)
                 ? (dateFocused, date)
                 : (date, dateFocused);
-        final dateEnd = range.$2;
-        dateSelected.push(dateEnd);
-        for (var d = range.$1; d.isBefore(dateEnd); d = d.dateAddDays(1)) {
-          dateSelected.push(d);
+        final dateEnd = selection.$2;
+        dateSelected.include(dateEnd);
+        final days = _rangingDistance;
+        for (
+          var day = selection.$1;
+          day.isBefore(dateEnd);
+          day = day.dateAddDays(days)
+        ) {
+          dateSelected.include(day);
         }
+        _rangingDistance = 0;
       } else {
         // 2.
-        dateSelected.push(date);
+        dateSelected.include(date);
       }
     }
-    setState(FListener.none);
+    setState(() => dateFocused = date);
     return false;
+  }
+
+  ///
+  ///
+  ///
+  _CalendarFocusFocusAndSelection(super.dateFocused, super.onNewDateFocused) {
+    _predicators
+      ..update(CalendarCellType.focused, (_) => _predicateFocus)
+      ..putIfAbsent(CalendarCellType.selected, () => _predicateSelected)
+      ..putIfAbsent(CalendarCellType.readyToAction, () => _predicateReady);
   }
 }

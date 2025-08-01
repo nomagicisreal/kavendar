@@ -2,6 +2,10 @@ part of '../table_calendar.dart';
 
 ///
 /// [CalendarStyleHeader]
+/// [CalendarStyleTextButton]
+/// [CalendarStyleChevrons]
+///
+///
 /// [CalendarStyleWeekNumber]
 /// [CalendarStyleDayOfWeek]
 ///
@@ -28,8 +32,8 @@ class CalendarStyleHeader {
   ///
   ///
   ///
-  final StyleTextButton? styleFormatButton;
-  final StyleChevrons? styleChevrons;
+  final CalendarStyleTextButton? styleFormatButton;
+  final CalendarStyleChevrons? styleChevrons;
 
   const CalendarStyleHeader({
     this.onTap,
@@ -41,7 +45,7 @@ class CalendarStyleHeader {
     this.titleTextFormatter,
     this.titleTextStyle = const TextStyle(fontSize: 17.0),
     this.styleFormatButton,
-    this.styleChevrons = const StyleChevrons(),
+    this.styleChevrons = const CalendarStyleChevrons(),
 
     DateLocaleBuilder? builderTitle,
     WidgetBuilder Function(
@@ -85,7 +89,7 @@ class CalendarStyleHeader {
       style.formatAvailables,
       updateFormatIndex,
     );
-    final buildChevron = styleChevrons?.builder;
+    final buildChevron = styleChevrons?._builder;
     return (focusedDate) => Container(
       decoration: decoration,
       margin: margin,
@@ -112,6 +116,133 @@ class CalendarStyleHeader {
       ),
     );
   }
+}
+
+///
+///
+///
+class CalendarStyleTextButton {
+  final String Function(int index)? _texting;
+  final TextStyle textStyle;
+  final BoxDecoration decoration;
+  final EdgeInsets padding;
+
+  const CalendarStyleTextButton({
+    String Function(int index)? texting,
+    this.textStyle = const TextStyle(fontSize: 14.0),
+    this.decoration = const BoxDecoration(
+      border: Border.fromBorderSide(BorderSide()),
+      borderRadius: BorderRadius.all(Radius.circular(12.0)),
+    ),
+    this.padding = const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+  }) : _texting = texting;
+
+  static String Function(int index) _textWeek<T>(List<T> items) => (index) {
+    final item = items[index];
+    return switch (item) {
+      1 => "1 week",
+      2 => "2 weeks",
+      6 => "6 weeks",
+      _ => throw StateError('unimplement item: $item'),
+    };
+  };
+
+  ///
+  ///
+  ///
+  static NotifierBuilder<int> _builderFromList<T>({
+    required List<T> items,
+    required CalendarStyleTextButton styleTextButton,
+    required ValueChanged<int> notifyChanging,
+  }) {
+    final weekOf = styleTextButton._texting ?? _textWeek(items);
+    return (weeksPerPage) => Padding(
+      padding: KGeometry.edgeInsets_left_1 * 8,
+      child: ValueListenableBuilder(
+        valueListenable: weeksPerPage,
+        builder: (context, index, child) {
+          return InkWell(
+            borderRadius: styleTextButton.decoration.borderRadius?.resolve(
+              context.textDirection,
+            ),
+            onTap: () => notifyChanging((index + 1) % items.length),
+            child: Container(
+              decoration: styleTextButton.decoration,
+              padding: styleTextButton.padding,
+              child: Text(
+                weekOf(weeksPerPage.value),
+                style: styleTextButton.textStyle,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  NotifierBuilder<int>? builderFrom<T>(
+    List<T> availableFormats,
+    ValueChanged<int> notifyChanging,
+  ) {
+    if (availableFormats.length == 1) return null;
+    return _builderFromList(
+      items: availableFormats,
+      styleTextButton: this,
+      notifyChanging: notifyChanging,
+    );
+  }
+}
+
+///
+///
+///
+class CalendarStyleChevrons {
+  final Widget iconLeft;
+  final Widget iconRight;
+  final EdgeInsets chevronPadding;
+  final EdgeInsets chevronMargin;
+  final GeneralBuilder<AnimateToFutureRequired>? builderLeft;
+  final GeneralBuilder<AnimateToFutureRequired>? builderRight;
+
+  const CalendarStyleChevrons({
+    this.chevronPadding = const EdgeInsets.all(12.0),
+    this.chevronMargin = const EdgeInsets.symmetric(horizontal: 8.0),
+    this.iconLeft = const Icon(Icons.chevron_left),
+    this.iconRight = const Icon(Icons.chevron_right),
+    this.builderLeft,
+    this.builderRight,
+  });
+
+  ///
+  ///
+  ///
+  static GeneralBuilder<AnimateToFutureRequired> _builderFrom(
+    CalendarStyleChevrons style,
+    Widget icon,
+    Duration duration,
+    Curve curve,
+  ) =>
+      (stepper) => Padding(
+        padding: style.chevronMargin,
+        child: InkWell(
+          onTap: () => stepper(duration: duration, curve: curve),
+          borderRadius: KGeometry.borderRadius_circularAll_1 * 100,
+          child: Padding(padding: style.chevronPadding, child: icon),
+        ),
+      );
+
+  Widget _builder(
+    DirectionIn4 direction, {
+    required AnimateToFutureRequired iconOnTap,
+    required Duration duration,
+    required Curve curve,
+  }) => (switch (direction) {
+    DirectionIn4.left =>
+      builderLeft ?? _builderFrom(this, iconLeft, duration, curve),
+    DirectionIn4.right =>
+      builderRight ?? _builderFrom(this, iconRight, duration, curve),
+    _ => throw StateError('invalid direction $direction'),
+  })(iconOnTap);
 }
 
 ///
@@ -171,6 +302,7 @@ class CalendarStyleDayOfWeek {
   final Decoration decoration;
   final TextStyle weekdayStyle;
   final TextStyle weekendStyle;
+  final Predicator<DateTime> predicateWeekend;
   final DateLocaleBuilder? _b;
 
   const CalendarStyleDayOfWeek({
@@ -179,6 +311,7 @@ class CalendarStyleDayOfWeek {
     this.decoration = const BoxDecoration(),
     this.weekdayStyle = const TextStyle(color: Color(0xFF4F4F4F)),
     this.weekendStyle = const TextStyle(color: Color(0xFF6A6A6A)),
+    this.predicateWeekend = DateTimeExtension.predicateWeekend,
     DateLocaleBuilder? builderDayOfWeek,
   }) : _b = builderDayOfWeek;
 
@@ -203,7 +336,6 @@ class CalendarStyleDayOfWeek {
       );
 
   TableRow Function(List<DateTime> dates) buildFrom({
-    required Predicator<DateTime> predicateWeekend,
     required dynamic locale,
     required Widget? weekNumberTitle,
   }) {
@@ -226,4 +358,3 @@ class CalendarStyleDayOfWeek {
     return (dates) => TableRow(decoration: decoration, children: row(dates));
   }
 }
-
