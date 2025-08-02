@@ -22,27 +22,41 @@ typedef CalendarFocusInitializer = CalendarFocus Function(DateTime dateFocused);
 /// [_predicators]
 ///
 sealed class CalendarFocus {
+  DateTimeRange domain;
   DateTime dateFocused;
   final Map<CalendarCellType, Predicator<DateTime>?> _predicators = {
     CalendarCellType.normal: null,
   };
 
-  CalendarFocus._(this.dateFocused);
+  CalendarFocus._(
+    this.dateFocused, {
+    DateTimeRange Function(DateTime) domainFrom = _domainFrom,
+  }) : domain = domainFrom(dateFocused);
 
   factory CalendarFocus(Calendar widget) => widget.style.focusInitializer(
-    (widget.focusedDate ?? DateTime.now()).dateOnly,
+    (widget.dateFocused ?? DateTime.now()).dateOnly,
   );
 
-  factory CalendarFocus.focusOnly(DateTime dateFocused) =
-      _CalendarFocusFocusOnly;
+  factory CalendarFocus.focusOnly(
+    DateTime dateFocused, {
+    DateTimeRange Function(DateTime) domainFrom,
+  }) = _CalendarFocusFocusOnly;
 
-  factory CalendarFocus.focusAndSelection(DateTime dateFocused) =
-      _CalendarFocusFocusAndSelection;
+  factory CalendarFocus.focusAndSelection(
+    DateTime dateFocused, {
+    DateTimeRange Function(DateTime) domainFrom,
+  }) = _CalendarFocusFocusAndSelection;
 
   ///
   ///
   ///
-  static const CalendarFocusStyle styleDefault = (
+  static DateTimeRange _domainFrom(DateTime dateFocused) =>
+      DateTimeRangeExtension.scopeMonthsFrom(dateFocused, before: 3, after: 3);
+
+  ///
+  ///
+  ///
+  static const CalendarCellStyle styleDefault = (
     CalendarCellType.normal,
     (
       BoxShape.circle,
@@ -60,7 +74,7 @@ sealed class CalendarFocus {
     ),
   );
 
-  static const List<CalendarFocusStyle> pSelectionOnly = [
+  static const List<CalendarCellStyle> pSelectionOnly = [
     (
       CalendarCellType.selected,
       (null, null, null, null, null, (MaterialColorRole.primary, null), null),
@@ -73,7 +87,7 @@ sealed class CalendarFocus {
     ),
   ];
 
-  static const List<CalendarFocusStyle> pSelectionAndReady = [
+  static const List<CalendarCellStyle> pSelectionAndReady = [
     (
       CalendarCellType.readyToAction,
       (null, null, null, null, null, (MaterialColorRole.primary, null), null),
@@ -109,6 +123,11 @@ sealed class CalendarFocus {
   // Map<CalendarCellType, Predicator<DateTime>?> get _predicators;
   //
   // Intersector<DateTime>? get onNewDateFocused;
+
+  bool predicateBlocked(DateTime date) {
+    final domain = this.domain;
+    return date.isBefore(domain.start) || date.isAfter(domain.end);
+  }
 
   bool predicateFocused(DateTime date) => date.isSameDate(dateFocused);
 
@@ -154,7 +173,7 @@ base class _CalendarFocusFocusOnly extends CalendarFocus {
   ///
   ///
   ///
-  _CalendarFocusFocusOnly(super.dateFocused) : super._() {
+  _CalendarFocusFocusOnly(super.dateFocused, {super.domainFrom}) : super._() {
     _predicators
       ..putIfAbsent(CalendarCellType.selected, () => predicateFocused)
       ..putIfAbsent(CalendarCellType.outside, () => predicateOutside);
@@ -180,7 +199,8 @@ base class _CalendarFocusFocusAndSelection extends CalendarFocus {
   bool _predicateReady(DateTime date) =>
       date == dateFocused && readyToRange && _selection.contains(date);
 
-  _CalendarFocusFocusAndSelection(super.dateFocused) : super._() {
+  _CalendarFocusFocusAndSelection(super.dateFocused, {super.domainFrom})
+    : super._() {
     _predicators
       ..putIfAbsent(CalendarCellType.selected, () => _predicateSelected)
       ..putIfAbsent(CalendarCellType.readyToAction, () => _predicateReady);

@@ -3,11 +3,18 @@ part of '../table_calendar.dart';
 
 ///
 ///
-/// [OnDateChanged], ...
-/// [PredicateCell], ...
+/// [CalendarUpdater]
 /// [EventSingleBuilder], ...
 ///
 ///
+
+typedef CalendarUpdater<T> =
+CalendarStyle Function(
+    CalendarPageState pageState,
+    CalendarFocus focus,
+    Calendar<T> oldWidget,
+    Calendar<T> widget,
+    );
 
 ///
 /// [PageController.animateTo]
@@ -38,16 +45,24 @@ typedef CellMetaBuilder =
       BuildContext context,
       BoxConstraints constraints,
       DateTime date,
-      CalendarCellType cellType,
+    );
+
+typedef CellStackBuilder =
+    Widget Function(
+      BuildContext context,
+      BoxConstraints constraints,
+      DateTime date,
+      Widget child,
     );
 
 typedef CellBuilder =
     Widget Function(
       BuildContext context,
       BoxConstraints constraints,
+      dynamic locale,
       DateTime date,
-      CalendarCellType cellType,
-      Widget child,
+      Decoration decoration,
+      TextStyle textStyle,
     );
 
 typedef TableRowsBuilder =

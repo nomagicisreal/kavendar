@@ -1,8 +1,9 @@
 part of '../table_calendar.dart';
 
 ///
+///
 /// [CalendarCellType]
-/// [CalendarFocusStyle]
+/// [CalendarCellStyle], [CalendarCellPrioritization]
 /// [CalendarStyleCellStack]
 /// [CalendarStyleCellStackOverlay]
 /// [CalendarStyleCellStackBackground]
@@ -20,13 +21,13 @@ enum CalendarCellType {
   normal,
 }
 
-typedef CalendarFocusStyle =
+typedef CalendarCellStyle =
     (CalendarCellType, MaterialDecoration?, MaterialTextStyle?);
 
-typedef CalendarCellBuilder =
+typedef CalendarCellPrioritization =
     (
       Predicator<DateTime>?,
-      CalendarCellType,
+      bool hasGesture,
       ContextGeneral<Decoration>,
       ContextGeneral<TextStyle>,
     );
@@ -35,23 +36,79 @@ typedef CalendarCellBuilder =
 ///
 ///
 class CalendarStyleCellStack {
-  final AlignmentGeometry cellStackAlignment;
-  final Clip cellStackClip;
+  final AlignmentGeometry alignment;
+  final Clip clip;
   final CalendarStyleCellStackOverlay styleOverlay;
   final CalendarStyleCellStackBackground? styleBackground;
 
   const CalendarStyleCellStack({
-    this.cellStackAlignment = Alignment.bottomCenter,
-    this.cellStackClip = Clip.none,
+    this.alignment = Alignment.bottomCenter,
+    this.clip = Clip.none,
     this.styleOverlay = const CalendarStyleCellStackOverlay(),
     this.styleBackground = const CalendarStyleCellStackBackground(),
   });
 
-  Widget _build(List<Widget> children) => Stack(
-    alignment: cellStackAlignment,
-    clipBehavior: cellStackClip,
-    children: children,
-  );
+  Widget _build(List<Widget> children) =>
+      Stack(alignment: alignment, clipBehavior: clip, children: children);
+
+  CellBuilder _initCellStackBuilder<T>({
+    required CalendarStyle style,
+    required CalendarFocus focus,
+    required EventLoader<T>? eventLoader,
+    required EventsLayoutMark<T>? eventsLayoutMark,
+    required EventElementMark<T>? eventLayoutSingleMark,
+  }) {
+    final buildBackground = styleBackground?.builderFrom(
+      style: style,
+      focus: focus,
+    );
+    final buildOverlay = styleOverlay.builderFrom(
+      style: style,
+      eventLoader: eventLoader,
+      eventsLayoutMark: eventsLayoutMark,
+      eventLayoutSingleMark: eventLayoutSingleMark,
+    );
+    final build = _build;
+    final CellStackBuilder stacking =
+        buildBackground == null
+            ? (buildOverlay == null
+                ? (_, __, ___, child) => build([child])
+                : (context, constraints, date, child) {
+                  final overlay = buildOverlay(context, constraints, date);
+                  return build([child, if (overlay != null) overlay]);
+                })
+            : (buildOverlay == null
+                ? (context, constraints, date, child) {
+                  final background = buildBackground(
+                    context,
+                    constraints,
+                    date,
+                  );
+                  return build([if (background != null) background, child]);
+                }
+                : (context, constraints, date, child) {
+                  final overlay = buildOverlay(context, constraints, date);
+                  final background = buildBackground(
+                    context,
+                    constraints,
+                    date,
+                  );
+                  return build([
+                    if (background != null) background,
+                    child,
+                    if (overlay != null) overlay,
+                  ]);
+                });
+
+    final cell = style._buildCell;
+    return (context, constraints, locale, date, decoration, textStyle) =>
+        stacking(
+          context,
+          constraints,
+          date,
+          cell(context, constraints, locale, date, decoration, textStyle),
+        );
+  }
 }
 
 ///
@@ -150,7 +207,7 @@ class CalendarStyleCellStackOverlay {
     if (eventLoader == null) return null;
     final layout = (eventsLayoutMark ?? _allPositionedRow<T>)(this);
     final mark = (eventLayoutSingleMark ?? _singleDecoration<T>)(this);
-    return (context, constraints, date, cellType) =>
+    return (context, constraints, date) =>
         layout(constraints, date, eventLoader(date), mark)!;
   }
 }
@@ -162,7 +219,6 @@ class CalendarStyleCellStackBackground {
   final HighlightWidthFrom<CalendarStyle> widthFrom;
   final double highlightScale;
   final MaterialColorRole highlightColor;
-  final Decoration rangeWithinDecoration;
 
   const CalendarStyleCellStackBackground({
     ///
@@ -170,8 +226,6 @@ class CalendarStyleCellStackBackground {
     ///
     this.highlightScale = 1.0,
     this.highlightColor = MaterialColorRole.tertiary,
-    this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
-
     this.widthFrom = _widthFrom,
   });
 
@@ -237,7 +291,7 @@ class CalendarStyleCellStackBackground {
         (DateTime, DateTime)? r;
         focus._consumeRanging = (range) => r = range;
         focus._onRangingAnimationFinished = (_) => r = null;
-        return (context, constraints, date, cellType) {
+        return (context, constraints, date) {
           final range = r;
           if (range == null) return build(context, constraints, null);
           final start = range.$1;

@@ -1,6 +1,7 @@
 // optimize https://github.com/aleksanderwozniak/table_calendar/releases/tag/v3.2.0
 library;
 
+import 'dart:nativewrappers/_internal/vm/lib/ffi_allocation_patch.dart';
 import 'dart:ui';
 
 import 'package:damath/damath.dart';

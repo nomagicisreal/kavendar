@@ -22,15 +22,3 @@ extension DCExtension on DatesContainer {
   }
 }
 
-///
-/// [DTExt]
-///
-
-///
-///
-///
-extension DTExt on DateTime {
-  static double pageFrom(DateTime start, DateTime target, int weeksPerPage) =>
-      (target.difference(start).inDays + 1) /
-      (DateTime.daysPerWeek * weeksPerPage);
-}

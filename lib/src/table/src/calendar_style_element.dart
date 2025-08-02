@@ -78,7 +78,7 @@ class CalendarStyleHeader {
   ///
   /// todo: enable format button
   ///
-  DateBuilder initBuilder({
+  DateBuilder _initBuilder({
     required PageController pageController,
     required CalendarStyle style,
     required dynamic locale,
