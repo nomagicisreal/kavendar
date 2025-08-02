@@ -60,12 +60,14 @@ class _CalendarState<T> extends State<Calendar<T>> {
   late int _indexPrevious;
 
   late double _cellHeight;
-  late DateTimeRange _domain;
+  late DateTimeRange _domain; // TODO: move domain into focus
   late CalendarFocus _focus;
   late Generator<DateTime> _paging;
   late CalendarStyle _style;
   late TableRowsBuilder _tableBuilder;
   late DateBuilder _builder;
+  late List<CalendarCellBuilder> _cellPrioritization;
+  late CellBuilder _builderCellStack;
   BoxConstraints? _constraintsBody;
 
   ///
@@ -104,6 +106,13 @@ class _CalendarState<T> extends State<Calendar<T>> {
       locale: widget.locale,
       pageWeeks: _pageWeeks,
       updateFormatIndex: _updateFormatIndex,
+    );
+    _cellPrioritization = style.cellPrioritizeWith(_focus._predicators);
+    _builderCellStack = style._initCellStackBuilder(
+      focus: _focus,
+      eventLoader: widget.eventLoader,
+      eventsLayoutMark: widget.eventsLayoutMark,
+      eventLayoutSingleMark: widget.eventLayoutSingleMark,
     );
   }
 
@@ -167,23 +176,13 @@ class _CalendarState<T> extends State<Calendar<T>> {
   }
 
   DateBuilder get _dateBuilder {
-    final style = _style;
-    final prioritization = style.cellPrioritizeWith(_focus._predicators);
-    final buildCellStack = style._initCellStackBuilder(
-      eventLoader: widget.eventLoader,
-      eventsLayoutMark: widget.eventsLayoutMark,
-      eventLayoutSingleMark: widget.eventLayoutSingleMark,
-    );
-    final buildCell = style._buildCell;
+    final prioritization = _cellPrioritization;
 
     // gesture
+    final style = _style;
     final onTap = _focus.onFocusDate;
     final hitTestBehavior = style.cellHitTestBehavior;
-    Widget active({
-      required bool isDisable,
-      required DateTime date,
-      required Widget child,
-    }) =>
+    Widget active(DateTime date, Widget child, {required bool isDisable}) =>
         isDisable
             ? child
             : GestureDetector(
@@ -191,30 +190,28 @@ class _CalendarState<T> extends State<Calendar<T>> {
               onTap: onTap(setState, date),
               child: child,
             );
+
+    final buildStack = _builderCellStack;
+    final build = style._buildCell;
     return (date) {
       if (_predicateBlocked(date)) return _layoutCell(null);
-      for (var current in prioritization) {
-        final predicate = current.$1;
+      for (var p in prioritization) {
+        final predicate = p.$1;
         if (predicate != null && !predicate(date)) continue;
-        final cellType = current.$2;
+        final type = p.$2;
         return _layoutCell(
           LayoutBuilder(
             builder: (context, constraints) {
               return active(
-                isDisable: cellType == CalendarCellType.disabled,
-                date: date,
-                child: buildCellStack(
-                  date,
-                  _focus.dateFocused,
-                  cellType,
+                date,
+                buildStack(
+                  context,
                   constraints,
-                  buildCell(
-                    date,
-                    widget.locale,
-                    current.$3(context),
-                    current.$4(context),
-                  ),
+                  date,
+                  type,
+                  build(date, widget.locale, p.$3(context), p.$4(context)),
                 ),
+                isDisable: type == CalendarCellType.disabled,
               );
             },
           ),

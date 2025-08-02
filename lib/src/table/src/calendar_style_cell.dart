@@ -44,7 +44,7 @@ class CalendarStyleCellStack {
     this.cellStackAlignment = Alignment.bottomCenter,
     this.cellStackClip = Clip.none,
     this.styleOverlay = const CalendarStyleCellStackOverlay(),
-    this.styleBackground,
+    this.styleBackground = const CalendarStyleCellStackBackground(),
   });
 
   Widget _build(List<Widget> children) => Stack(
@@ -142,6 +142,7 @@ class CalendarStyleCellStackOverlay {
   }
 
   CellMetaBuilder? builderFrom<T>({
+    required CalendarStyle style,
     required EventLoader<T>? eventLoader,
     required EventsLayoutMark<T>? eventsLayoutMark,
     required EventElementMark<T>? eventLayoutSingleMark,
@@ -149,7 +150,7 @@ class CalendarStyleCellStackOverlay {
     if (eventLoader == null) return null;
     final layout = (eventsLayoutMark ?? _allPositionedRow<T>)(this);
     final mark = (eventLayoutSingleMark ?? _singleDecoration<T>)(this);
-    return (date, focusedDate, cellType, constraints) =>
+    return (context, constraints, date, cellType) =>
         layout(constraints, date, eventLoader(date), mark)!;
   }
 }
@@ -159,13 +160,8 @@ class CalendarStyleCellStackOverlay {
 ///
 class CalendarStyleCellStackBackground {
   final HighlightWidthFrom<CalendarStyle> widthFrom;
-  final OnRangeSelected? onRangeSelected;
-
-  ///
-  ///
-  ///
   final double highlightScale;
-  final Color highlightColor;
+  final MaterialColorRole highlightColor;
   final Decoration rangeWithinDecoration;
 
   const CalendarStyleCellStackBackground({
@@ -173,9 +169,8 @@ class CalendarStyleCellStackBackground {
     ///
     ///
     this.highlightScale = 1.0,
-    this.highlightColor = const Color(0xFFBBDDFF),
+    this.highlightColor = MaterialColorRole.tertiary,
     this.rangeWithinDecoration = const BoxDecoration(shape: BoxShape.circle),
-    this.onRangeSelected,
 
     this.widthFrom = _widthFrom,
   });
@@ -187,63 +182,77 @@ class CalendarStyleCellStackBackground {
   ///
   ///
   ///
-  static ConstraintsRangeBuilder _backgroundHighlight(
+  static const int highlightAlphaDefault = 0x22;
+
+  static ConstraintsRangeBuilder _highlight(
     CalendarStyle style,
     CalendarStyleCellStackBackground styleRange,
   ) {
-    final doubleFrom = styleRange.widthFrom(style);
-    return (s, constraints) => Center(
-      child: Container(
-        margin: EdgeInsetsDirectional.only(
-          start: s == RangeState3.start ? constraints.maxWidth * 0.5 : 0.0,
-          end: s == RangeState3.end ? constraints.maxWidth * 0.5 : 0.0,
+    //
+    final duration = style.cellAnimationDuration;
+    final curve = style.cellAnimationCurve;
+    final heightFrom = styleRange.widthFrom(style);
+    final heightScale = styleRange.highlightScale;
+
+    //
+    final emphasis = styleRange.highlightColor;
+    final color = emphasis.buildColor;
+    final animationStyle = AnimationStyle(
+      duration: duration ~/ 2,
+      reverseDuration: duration ~/ 2,
+      curve: curve,
+      reverseCurve: curve,
+    );
+    final mamable = MamableSingle(
+      Between(begin: 0.0, end: 1.0, curve: (curve, curve)),
+      (o, child) => Opacity(opacity: o.value, child: child),
+    );
+    return (context, constraints, state) => Center(
+      child: Mationani.mamion(
+        ani: Ani.update(
+          style: animationStyle,
+          onNotAnimating: FAni.decideForwardThenReverse(state != null),
         ),
-        height: doubleFrom(constraints) * styleRange.highlightScale,
-        color: styleRange.highlightColor,
+        mamable: mamable,
+        child: Container(
+          height: heightFrom(constraints) * heightScale,
+          color: color(context).withAlpha(highlightAlphaDefault),
+        ),
       ),
     );
   }
 
   ///
   ///
-  /// selected date changed
-  /// 0. reset
-  /// 1. rangeStart == null -> find range start date
-  /// 2. rangeStart != null, rangeEnd == null -> find another range date, range within date(s), unselect rangeStart
-  /// 3. rangeStart != null, rangeEnd != null -> expand range, shrink range, unselect rangeEnd
-  ///
   ///
   CellMetaBuilder? builderFrom({
     required CalendarStyle style,
-    required bool isBackground,
+    required CalendarFocus focus,
   }) {
-    if (!isBackground) {
-      throw UnimplementedError();
+    switch (focus) {
+      case _CalendarFocusFocusOnly():
+        return null;
+      case _CalendarFocusFocusAndSelection():
+        final build = _highlight(style, this);
+        (DateTime, DateTime)? r;
+        focus._consumeRanging = (range) => r = range;
+        focus._onRangingAnimationFinished = (_) => r = null;
+        return (context, constraints, date, cellType) {
+          final range = r;
+          if (range == null) return build(context, constraints, null);
+          final start = range.$1;
+          final end = range.$2;
+          if (start == end) return build(context, constraints, null);
+          if (date.isBefore(start)) return build(context, constraints, null);
+          if (date.isAfter(start)) {
+            if (date.isAfter(end)) return build(context, constraints, null);
+            if (date.isBefore(end)) {
+              return build(context, constraints, RangeState3.within);
+            }
+            return build(context, constraints, RangeState3.end);
+          }
+          return build(context, constraints, RangeState3.start);
+        };
     }
-    // final rangeStart = _rangeStart;
-    // if (rangeStart == null) return null;
-    // if (date.isBefore(rangeStart)) return null;
-    // if (date.isAfter(rangeStart)) {
-    //   final rangeEnd = this.rangeEnd;
-    //   if (rangeEnd == null) return null;
-    //   if (date.isAfter(rangeEnd)) return null;
-    //   if (date.isBefore(rangeEnd)) {
-    //     final builder =
-    //         isBackground
-    //             ? _bHighlight ?? _backgroundHighlight(style, this)
-    //             : _bWithin ?? _builderRangeWithin(style, this);
-    //     return (_, constraints) => builder(RangeState3.within, constraints);
-    //   }
-    //   final builder =
-    //       isBackground
-    //           ? _bHighlight ?? _backgroundHighlight(style, this)
-    //           : _bEnd ?? _builderRangeEnd(style, this);
-    //   return (_, constraints) => builder(RangeState3.end, constraints);
-    // }
-    // final builder =
-    //     isBackground
-    //         ? _bHighlight ?? _backgroundHighlight(style, this)
-    //         : _bStart ?? _builderRangeStart(style, this);
-    // return (_, constraints) => builder(RangeState3.start, constraints);
   }
 }

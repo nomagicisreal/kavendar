@@ -15,22 +15,12 @@ part of '../table_calendar.dart';
 /// [PageController.previousPage]
 /// [PageController.nextPage]
 ///
-typedef AnimateToFutureRequired = Future<void> Function(
-    {required Duration duration, required Curve curve});
+typedef AnimateToFutureRequired =
+    Future<void> Function({required Duration duration, required Curve curve});
 
-
-///
-///
-///
 typedef OnPageChanged =
     void Function(int index, int indexPrevious, DateTime focusedDate);
 
-typedef OnRangeSelected =
-    void Function(DateTime? start, DateTime? end, DateTime focusedDate);
-
-///
-///
-///
 typedef CalendarPageControllerInitializer =
     PageController Function(
       DateTimeRange domain,
@@ -45,18 +35,18 @@ typedef DateBuilder = Widget Function(DateTime date);
 typedef DateLocaleBuilder = Widget Function(DateTime date, dynamic locale);
 typedef CellMetaBuilder =
     Widget? Function(
-      DateTime date,
-      DateTime? focusedDate,
-      CalendarCellType cellType,
+      BuildContext context,
       BoxConstraints constraints,
+      DateTime date,
+      CalendarCellType cellType,
     );
 
 typedef CellBuilder =
     Widget Function(
-      DateTime date,
-      DateTime? focusedDate,
-      CalendarCellType cellType,
+      BuildContext context,
       BoxConstraints constraints,
+      DateTime date,
+      CalendarCellType cellType,
       Widget child,
     );
 
@@ -67,7 +57,11 @@ typedef TableRowsBuilder =
 ///
 ///
 typedef ConstraintsRangeBuilder =
-    Widget Function(RangeState3 state, BoxConstraints constraints);
+    Widget Function(
+      BuildContext context,
+      BoxConstraints constraints,
+      RangeState3? state,
+    );
 
 typedef BoxConstraintsDouble = double Function(BoxConstraints constraints);
 
@@ -97,12 +91,7 @@ typedef EventsLayoutMark<T> =
     );
 
 ///
-///
-///
-typedef CalendarCellConfiguration = Map<CalendarCellType, Predicator<DateTime>>;
-
-///
-/// todo: ValueListenableBuilder for each cell.
+/// todo: ValueListenableBuilder for each cell?
 ///
 
 ///
@@ -219,4 +208,3 @@ typedef CalendarCellConfiguration = Map<CalendarCellType, Predicator<DateTime>>;
 //       this.blockOutsideMonthDate,
 //       );
 // }
-

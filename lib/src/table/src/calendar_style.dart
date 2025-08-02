@@ -53,6 +53,7 @@ class CalendarStyle {
   final EdgeInsets cellPadding;
   final AlignmentGeometry cellAlignment;
   final Duration cellAnimationDuration;
+  final Curve cellAnimationCurve;
   final Decoration tableRowDecoration;
   final TableBorder tableBorder;
   final EdgeInsets tablePadding;
@@ -91,7 +92,7 @@ class CalendarStyle {
     this.styleHeader = const CalendarStyleHeader(),
     this.styleDayOfWeek = const CalendarStyleDayOfWeek(),
     this.styleWeekNumber,
-    this.styleCellStack,
+    this.styleCellStack = const CalendarStyleCellStack(),
 
     //
     this.tableRowDecoration = const BoxDecoration(),
@@ -105,12 +106,13 @@ class CalendarStyle {
     this.cellPadding = EdgeInsets.zero,
     this.cellAlignment = Alignment.center,
     this.cellAnimationDuration = Durations.medium1,
+    this.cellAnimationCurve = Curves.linear,
 
     //
     // this.focusInitializer = CalendarFocus.focusOnly,
     // this.focusStyle = CalendarFocus.pFocusOnly,
     this.focusInitializer = CalendarFocus.focusAndSelection,
-    this.focusStyle = CalendarFocus.pFocusAndSelection,
+    this.focusStyle = CalendarFocus.pSelectionAndReady,
     this.focusStyleDefault = CalendarFocus.styleDefault,
   }) : _tableColumnWidth = tableColumnWidth;
 
@@ -159,7 +161,8 @@ class CalendarStyle {
   List<CalendarCellBuilder> cellPrioritizeWith(
     Map<CalendarCellType, Predicator<DateTime>?> predicators,
   ) {
-    if (predicators.length != focusStyle.length + 1) {
+    final prioritization = [...focusStyle, focusStyleDefault];
+    if (predicators.keys.isVariantTo(prioritization.map((s) => s.$1))) {
       throw ArgumentError(
         'predicators (${predicators.length}) '
         'not corresponding to '
@@ -280,6 +283,7 @@ class CalendarStyle {
     excludeSemantics: true,
     child: AnimatedContainer(
       duration: cellAnimationDuration,
+      curve: cellAnimationCurve,
       margin: cellMargin,
       padding: cellPadding,
       decoration: decoration,
@@ -329,6 +333,7 @@ class CalendarStyle {
   /// [_initCalendarBuilder]
   ///
   CellBuilder _initCellStackBuilder<T>({
+    required CalendarFocus focus,
     required EventLoader<T>? eventLoader,
     required EventsLayoutMark<T>? eventsLayoutMark,
     required EventElementMark<T>? eventLayoutSingleMark,
@@ -337,9 +342,10 @@ class CalendarStyle {
     if (styleCellStack == null) return (_, __, ___, ____, child) => child;
     final buildBackground = styleCellStack.styleBackground?.builderFrom(
       style: this,
-      isBackground: true,
+      focus: focus,
     );
     final buildOverlay = styleCellStack.styleOverlay.builderFrom(
+      style: this,
       eventLoader: eventLoader,
       eventsLayoutMark: eventsLayoutMark,
       eventLayoutSingleMark: eventLayoutSingleMark,
@@ -349,37 +355,37 @@ class CalendarStyle {
     return buildBackground == null
         ? (buildOverlay == null
             ? (_, __, ___, ____, child) => child
-            : (date, focusedDate, cellType, constraints, child) {
+            : (context, constraints, date, cellType, child) {
               final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
+                context,
                 constraints,
+                date,
+                cellType,
               );
               return build([child, if (overlay != null) overlay]);
             })
         : (buildOverlay == null
-            ? (date, focusedDate, cellType, constraints, child) {
+            ? (context, constraints, date, cellType, child) {
               final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
+                context,
                 constraints,
+                date,
+                cellType,
               );
               return build([if (background != null) background, child]);
             }
-            : (date, focusedDate, cellType, constraints, child) {
+            : (context, constraints, date, cellType, child) {
               final overlay = buildOverlay(
-                date,
-                focusedDate,
-                cellType,
+                context,
                 constraints,
+                date,
+                cellType,
               );
               final background = buildBackground(
-                date,
-                focusedDate,
-                cellType,
+                context,
                 constraints,
+                date,
+                cellType,
               );
               return build([
                 if (background != null) background,
